@@ -1,0 +1,203 @@
+{
+    "typeName": "AWS::Synthetics::Canary",
+    "description": "Resource Type definition for AWS::Synthetics::Canary",
+    "sourceUrl": "https://docs.aws.amazon.com/cloudformation-cli/latest/userguide/resource-type-walkthrough.html",
+    "properties": {
+        "Name": {
+            "description": "Name of the canary.",
+            "type": "string",
+            "pattern": "^[0-9a-z_\\-]{1,21}$",
+            "minLength": 1,
+            "maxLength": 255
+        },
+        "Id": {
+            "description": "Id of the canary",
+            "type": "string"
+        },
+        "State": {
+            "description": "State of the canary",
+            "type": "string"
+        },
+        "Code": {
+            "description": "Provide the canary script source",
+            "$ref" : "#/definitions/Code"
+        },
+        "ArtifactLocation": {
+            "description": "Provide the s3 bucket output location for test results",
+            "type": "string",
+            "pattern": "^(s3:\\|S3:\\)"
+        },
+        "Schedule": {
+            "description": "Frequency to run your canaries",
+            "$ref" : "#/definitions/Schedule"
+        },
+        "ExecutionIAMRoleArn": {
+            "description": "Lambda Execution role used to run your canaries",
+            "type": "string",
+            "pattern": "^arn:(aws|aws-cn|aws-us-gov|aws-iso-{0,1}[a-z]{0,1}):[A-Za-z0-9][A-Za-z0-9_/.-]{0,62}:[A-Za-z0-9_/.-]{0,63}:[A-Za-z0-9_/.-]{0,63}:[A-Za-z0-9][A-Za-z0-9:_/+=,@.-]{0,1023}$"
+        },
+        "RuntimeVersion": {
+            "description": "Runtime version of Synthetics Library",
+            "type": "string"
+        },
+        "SuccessRetentionPeriod": {
+            "description": "Time to retain the successful canary runs",
+            "type": "integer"
+        },
+        "FailureRetentionPeriod": {
+            "description": "Time to retain the successful canary runs",
+            "type": "integer"
+        },
+        "Tags" : {
+            "type" : "array",
+            "uniqueItems" : false,
+            "items" : {
+                "$ref" : "#/definitions/Tag"
+            }
+        },
+        "VPCConfig": {
+            "description": "Provide VPC Configuration if enabled.",
+            "$ref" : "#/definitions/VpcConfig"
+        },
+        "StartCanaryAfterCreation": {
+            "description": "Runs canary if set to True. Default is False",
+            "type": "boolean"
+        }
+    },
+    "definitions" : {
+        "Schedule" : {
+            "type" : "object",
+            "additionalProperties" : false,
+            "properties" : {
+                "Expression" : {
+                    "type" : "string",
+                    "pattern": "^rate(.*.)$"
+                },
+                "DurationInSeconds" : {
+                    "type" : "string"
+                }
+            },
+            "required" : [ "Expression", "DurationInSeconds" ]
+        },
+        "Code" : {
+            "type" : "object",
+            "additionalProperties" : false,
+            "properties" : {
+                "S3Bucket": {
+                    "type": "string"
+                },
+                "S3Key": {
+                    "type": "string"
+                },
+                "S3ObjectVersion": {
+                    "type": "string"
+                },
+                "Script": {
+                    "type": "string"
+                },
+                "Handler": {
+                    "type": "string"
+                }
+            },
+            "oneOf": [
+                {
+                    "required": [
+                        "S3Bucket",
+                        "S3Key",
+                        "S3ObjectVersion",
+                        "Handler"
+                    ]
+                },
+                {
+                    "required": [
+                        "Script",
+                        "Handler"
+                    ]
+                }
+            ]
+        },
+        "Tag" : {
+            "type" : "object",
+            "additionalProperties" : false,
+            "properties" : {
+                "Key" : {
+                    "type" : "string"
+                },
+                "Value" : {
+                    "type" : "string"
+                }
+            },
+            "required" : [ "Value", "Key" ]
+        },
+        "VpcConfig" : {
+            "type" : "object",
+            "additionalProperties" : false,
+            "properties" : {
+                "VpcId" : {
+                    "type" : "string"
+                },
+                "SubnetIds" : {
+                    "type" : "array",
+                    "pattern": "^([0-9a-z_\\-]{0-16})$",
+                    "items" : {
+                        "type" : "string"
+                    }
+                },
+                "SecurityGroupIds" : {
+                    "type" : "array",
+                    "pattern": "^([0-9a-z_\\-]{0-5})$",
+                    "items" : {
+                        "type" : "string"
+                    }
+                }
+            },
+            "required" : [ "VpcId", "SubnetIds", "SecurityGroupIds" ]
+        }
+    },
+    "required": [
+        "Name",
+        "Code",
+        "ArtifactLocation",
+        "ExecutionRoleArn",
+        "Schedule",
+        "RuntimeVersion",
+        "StartCanaryAfterCreation"
+    ],
+    "handlers": {
+        "create": {
+            "permissions": [
+                "s3:CreateBucket",
+                "s3:PutBucketEncryption",
+                "s3:PutEncryptionConfiguration",
+                "s3:GetBucketLocation",
+                "iam:PassRole"
+            ]
+        },
+        "read": {
+            "permissions": [
+                "synthetics:ListCanaries",
+                "synthetics:DescribeCanaries"
+            ]
+        },
+        "delete": {
+            "permissions": [
+                "synthetics:DeleteCanary"
+            ]
+        },
+        "list": {
+            "permissions": [
+                "synthetics:DescribeCanaries"
+            ]
+        }
+    },
+    "additionalProperties": false,
+    "primaryIdentifier": [
+        "/properties/Name",
+        "/properties/Id"
+    ],
+    "readOnlyProperties": [
+        "/properties/Name",
+        "/properties/Id",
+        "/properties/State"
+    ]
+}
