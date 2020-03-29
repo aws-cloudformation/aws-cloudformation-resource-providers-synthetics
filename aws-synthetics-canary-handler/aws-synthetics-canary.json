@@ -6,9 +6,7 @@
         "Name": {
             "description": "Name of the canary.",
             "type": "string",
-            "pattern": "^[0-9a-z_\\-]{1,21}$",
-            "minLength": 1,
-            "maxLength": 255
+            "pattern": "^[0-9a-z_\\-]{1,21}$"
         },
         "Id": {
             "description": "Id of the canary",
@@ -41,11 +39,11 @@
             "type": "string"
         },
         "SuccessRetentionPeriod": {
-            "description": "Time to retain the successful canary runs",
+            "description": "Retention period of successful canary runs represented in number of days",
             "type": "integer"
         },
         "FailureRetentionPeriod": {
-            "description": "Time to retain the successful canary runs",
+            "description": "Retention period of failed canary runs represented in number of days",
             "type": "integer"
         },
         "Tags" : {
@@ -104,7 +102,6 @@
                     "required": [
                         "S3Bucket",
                         "S3Key",
-                        "S3ObjectVersion",
                         "Handler"
                     ]
                 },
