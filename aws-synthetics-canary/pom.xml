@@ -6,8 +6,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.amazon.synthetics.canary</groupId>
-    <artifactId>aws-synthetics-canary-handler</artifactId>
-    <name>aws-synthetics-canary-handler</name>
+    <artifactId>aws-synthetics-canary</artifactId>
+    <name>aws-synthetics-canary</name>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
