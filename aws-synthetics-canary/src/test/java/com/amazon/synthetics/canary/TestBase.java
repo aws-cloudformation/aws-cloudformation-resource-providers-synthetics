@@ -1,8 +1,5 @@
 package com.amazon.synthetics.canary;
 
-import com.amazonaws.services.route53.model.VPC;
-import org.apache.commons.collections.map.HashedMap;
-import org.joda.time.DateTime;
 import software.amazon.awssdk.services.synthetics.model.*;
 
 import java.util.ArrayList;
