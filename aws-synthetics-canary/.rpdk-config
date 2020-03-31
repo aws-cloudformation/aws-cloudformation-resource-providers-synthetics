@@ -1,0 +1,15 @@
+{
+    "typeName": "AWS::Synthetics::Canary",
+    "language": "java",
+    "runtime": "java8",
+    "entrypoint": "com.amazon.synthetics.canary.HandlerWrapper::handleRequest",
+    "testEntrypoint": "com.amazon.synthetics.canary.HandlerWrapper::testEntrypoint",
+    "settings": {
+        "namespace": [
+            "com",
+            "amazon",
+            "synthetics",
+            "canary"
+        ]
+    }
+}
