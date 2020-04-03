@@ -55,7 +55,11 @@
         },
         "VPCConfig": {
             "description": "Provide VPC Configuration if enabled.",
-            "$ref" : "#/definitions/VpcConfig"
+            "$ref" : "#/definitions/VPCConfig"
+        },
+        "RunConfig": {
+            "description": "Provide maximum canary timeout per run in seconds ",
+            "$ref" : "#/definitions/RunConfig"
         },
         "StartCanaryAfterCreation": {
             "description": "Runs canary if set to True. Default is False",
@@ -113,20 +117,29 @@
                 }
             ]
         },
-        "Tag" : {
-            "type" : "object",
-            "additionalProperties" : false,
-            "properties" : {
-                "Key" : {
-                    "type" : "string"
+        "Tag": {
+            "description": "A key-value pair to associate with a resource.",
+            "type": "object",
+            "properties": {
+                "Key": {
+                    "type": "string",
+                    "description": "The key name of the tag. You can specify a value that is 1 to 127 Unicode characters in length and cannot be prefixed with aws:. You can use any of the following characters: the set of Unicode letters, digits, whitespace, _, ., /, =, +, and -. ",
+                    "minLength": 1,
+                    "maxLength": 128
                 },
-                "Value" : {
-                    "type" : "string"
+                "Value": {
+                    "type": "string",
+                    "description": "The value for the tag. You can specify a value that is 1 to 255 Unicode characters in length and cannot be prefixed with aws:. You can use any of the following characters: the set of Unicode letters, digits, whitespace, _, ., /, =, +, and -. ",
+                    "minLength": 0,
+                    "maxLength": 256
                 }
             },
-            "required" : [ "Value", "Key" ]
+            "required": [
+                "Value",
+                "Key"
+            ]
         },
-        "VpcConfig" : {
+        "VPCConfig" : {
             "type" : "object",
             "additionalProperties" : false,
             "properties" : {
@@ -148,7 +161,22 @@
                     }
                 }
             },
-            "required" : [ "VpcId", "SubnetIds", "SecurityGroupIds" ]
+            "required" : [
+                "SubnetIds",
+                "SecurityGroupIds"
+            ]
+        },
+        "RunConfig" : {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "TimeoutInSeconds": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "TimeoutInSeconds"
+            ]
         }
     },
     "required": [
@@ -162,6 +190,15 @@
     ],
     "handlers": {
         "create": {
+            "permissions": [
+                "s3:CreateBucket",
+                "s3:PutBucketEncryption",
+                "s3:PutEncryptionConfiguration",
+                "s3:GetBucketLocation",
+                "iam:PassRole"
+            ]
+        },
+        "update": {
             "permissions": [
                 "s3:CreateBucket",
                 "s3:PutBucketEncryption",

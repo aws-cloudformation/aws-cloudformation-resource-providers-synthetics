@@ -20,6 +20,9 @@ public class CallbackContext {
 
     private int stabilizationRetryTimes;
 
+    private boolean canaryUpdationStarted;
+    private boolean canaryUpdationStablized;
+
     private boolean canaryDeleteStarted;
     private boolean canaryDeleteStabilized;
 
