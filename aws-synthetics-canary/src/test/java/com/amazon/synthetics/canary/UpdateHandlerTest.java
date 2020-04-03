@@ -9,6 +9,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.proxy.*;
 
+import java.util.ArrayList;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -16,7 +18,7 @@ import static org.mockito.Mockito.mock;
 
 
 @ExtendWith(MockitoExtension.class)
-public class CreateHandlerTest extends TestBase{
+public class UpdateHandlerTest {
     private static String EXPECTED_TIMEOUT_MESSAGE = "Timed out waiting for the canary to become available";
 
     @Mock
@@ -25,7 +27,7 @@ public class CreateHandlerTest extends TestBase{
     @Mock
     private Logger logger;
 
-    private CreateHandler handler;
+    private UpdateHandler handler;
 
     private ResourceHandlerRequest<ResourceModel> request;
 
@@ -35,7 +37,7 @@ public class CreateHandlerTest extends TestBase{
     public void setup() {
         proxy = mock(AmazonWebServicesClientProxy.class);
         logger = mock(Logger.class);
-        handler  = new CreateHandler();
+        handler  = new UpdateHandler();
         request = ResourceHandlerRequest.<ResourceModel>builder()
                 .desiredResourceState(buildModel())
                 .clientRequestToken("clientRequestToken")
@@ -77,6 +79,18 @@ public class CreateHandlerTest extends TestBase{
         scheduleForTesting.setDurationInSeconds("3600");
         scheduleForTesting.setExpression("rate(1 min)");
 
+        ArrayList<String> subnetIds = new ArrayList<>();
+        subnetIds.add("subnet-3a473011");
+        subnetIds.add("subnet-123f3159");
+
+        ArrayList<String> securityGroups = new ArrayList<>();
+        securityGroups.add("sg-5582b213");
+
+        final VPCConfig vpcConfig = new VPCConfig();
+        vpcConfig.setSubnetIds(subnetIds);
+        vpcConfig.setSecurityGroupIds(securityGroups);
+
+        RunConfig runConfig = RunConfig.builder().timeoutInSeconds(600).build();
 
         model = ResourceModel.builder()
                 .name(String.format("canary_created_from_cloudformation-" + new DateTime().toString()))
@@ -86,9 +100,10 @@ public class CreateHandlerTest extends TestBase{
                 .schedule(scheduleForTesting)
                 .runtimeVersion("syn-1.0")
                 .startCanaryAfterCreation(true)
-                .runConfig(RunConfig.builder().timeoutInSeconds(60).build())
-                .successRetentionPeriod(31)
+                .vPCConfig(vpcConfig)
+                .runConfig(runConfig)
                 .failureRetentionPeriod(31)
+                .successRetentionPeriod(31)
                 .build();
 
         return model;
@@ -101,27 +116,9 @@ public class CreateHandlerTest extends TestBase{
                 .build();
 
         final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryCreationStarted(true)
-                .canaryCreationStablized(true)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
+                .canaryUpdationStarted(true)
+                .canaryUpdationStablized(true)
                 .build();
-
-        final Canary canary = Canary.builder()
-                .name("canarytestname")
-                .code(codeOutputObjectForTesting())
-                .status(CanaryStatus.builder()
-                        .state("RUNNING")
-                        .build())
-                .schedule(canaryScheduleOutputForTesting())
-                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).build())
-                .build();
-
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-                .canary(canary)
-                .build();
-
-        doReturn(getCanaryResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
 
@@ -134,46 +131,5 @@ public class CreateHandlerTest extends TestBase{
         assertThat(response.getMessage()).isNull();
         assertThat(response.getErrorCode()).isNull();
     }
-
-    @Test
-    public void handleRequest_createCanary_inProgress() {
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(model)
-                .build();
-
-        final Canary canary = Canary.builder()
-                .name("canarytestname")
-                .code(codeOutputObjectForTesting())
-                .status(CanaryStatus.builder()
-                        .state("RUNNING")
-                        .build())
-                .schedule(canaryScheduleOutputForTesting())
-                .build();
-
-        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-                .canary(canary)
-                .build();
-       // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-        final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
-
-        doReturn(createCanaryResponse,
-                getCanaryResponse,
-                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
-
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(30);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-        assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getMessage()).isNull();
-        assertThat(response.getErrorCode()).isNull();
-    }
 }
+

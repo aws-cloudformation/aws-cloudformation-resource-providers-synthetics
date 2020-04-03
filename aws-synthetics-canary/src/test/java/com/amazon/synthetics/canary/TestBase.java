@@ -20,6 +20,7 @@ public class TestBase {
                 .vPCConfig(vpcConfigForTesting())
                 .state("RUNNING")
                 .tags(buildTagObject(new HashMap<String, String>()))
+                .runConfig(RunConfig.builder().timeoutInSeconds(50).build())
                 .build();
         return model;
     }
@@ -33,8 +34,8 @@ public class TestBase {
         return codeObjectForTesting;
     }
 
-    public static VpcConfig vpcConfigForTesting() {
-        VpcConfig vpcConfig  = new VpcConfig();
+    public static VPCConfig vpcConfigForTesting() {
+        VPCConfig vpcConfig  = new VPCConfig();
         List<String> securityGroupIds = new ArrayList<String>();
         securityGroupIds.add("sg-085912345678492fb");
         securityGroupIds.add("sg-085912345678492fc");
@@ -82,6 +83,7 @@ public class TestBase {
                 .runtimeVersion("syn-1.0")
                 .vpcConfig(canaryVpcConfigOutputForTesting())
                 .status(canaryStatusForTesting())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(50).build())
                 .build();
         return cfnCanary;
     }
@@ -114,5 +116,12 @@ public class TestBase {
                 .securityGroupIds("sg-085912345678492fb", "sg-085912345678492fc")
                 .subnetIds("subnet-071f712345678e7c8", "subnet-07fd123456788a036").build();
         return vpcConfigOutput;
+    }
+
+    public static Map<String, String> sampleTags() {
+        Map<String, String> tagMap = new HashMap<String, String>();
+        tagMap.put("test1Key", "test1Value");
+        tagMap.put("test2Key", "test12Value");
+        return tagMap;
     }
 }
