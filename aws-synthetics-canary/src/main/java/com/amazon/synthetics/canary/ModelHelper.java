@@ -25,8 +25,8 @@ public class ModelHelper {
 
         model.setId(canary.id());
         model.setName(canary.name());
-        model.setArtifactLocation(canary.artifactLocation());
-        model.setExecutionIAMRoleArn(canary.executionRoleArn());
+        model.setArtifactS3Location(canary.artifactLocation());
+        model.setExecutionRoleArn(canary.executionRoleArn());
         model.setFailureRetentionPeriod(canary.failureRetentionPeriodInDays());
         model.setSuccessRetentionPeriod(canary.successRetentionPeriodInDays());
         model.setRuntimeVersion(canary.runtimeVersion());

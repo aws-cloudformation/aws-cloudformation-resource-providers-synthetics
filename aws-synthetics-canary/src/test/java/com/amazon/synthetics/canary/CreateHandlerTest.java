@@ -80,9 +80,9 @@ public class CreateHandlerTest extends TestBase{
 
         model = ResourceModel.builder()
                 .name(String.format("canary_created_from_cloudformation-" + new DateTime().toString()))
-                .artifactLocation("s3://cloudformation-created-bucket")
+                .artifactS3Location("s3://cloudformation-created-bucket")
                 .code(codeObjectForTesting)
-                .executionIAMRoleArn("arn:aws:test::myaccount")
+                .executionRoleArn("arn:aws:test::myaccount")
                 .schedule(scheduleForTesting)
                 .runtimeVersion("syn-1.0")
                 .startCanaryAfterCreation(true)
@@ -170,7 +170,7 @@ public class CreateHandlerTest extends TestBase{
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(30);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(5);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();

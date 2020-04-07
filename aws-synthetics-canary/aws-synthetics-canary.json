@@ -20,19 +20,17 @@
             "description": "Provide the canary script source",
             "$ref" : "#/definitions/Code"
         },
-        "ArtifactLocation": {
+        "ArtifactS3Location": {
             "description": "Provide the s3 bucket output location for test results",
-            "type": "string",
-            "pattern": "^(s3:\\|S3:\\)"
+            "type": "string"
         },
         "Schedule": {
             "description": "Frequency to run your canaries",
             "$ref" : "#/definitions/Schedule"
         },
-        "ExecutionIAMRoleArn": {
+        "ExecutionRoleArn": {
             "description": "Lambda Execution role used to run your canaries",
-            "type": "string",
-            "pattern": "^arn:(aws|aws-cn|aws-us-gov|aws-iso-{0,1}[a-z]{0,1}):[A-Za-z0-9][A-Za-z0-9_/.-]{0,62}:[A-Za-z0-9_/.-]{0,63}:[A-Za-z0-9_/.-]{0,63}:[A-Za-z0-9][A-Za-z0-9:_/+=,@.-]{0,1023}$"
+            "type": "string"
         },
         "RuntimeVersion": {
             "description": "Runtime version of Synthetics Library",
@@ -72,8 +70,7 @@
             "additionalProperties" : false,
             "properties" : {
                 "Expression" : {
-                    "type" : "string",
-                    "pattern": "^rate(.*.)$"
+                    "type" : "string"
                 },
                 "DurationInSeconds" : {
                     "type" : "string"
@@ -101,16 +98,16 @@
                     "type": "string"
                 }
             },
-            "oneOf": [
+            "oneOf":[
                 {
-                    "required": [
+                    "required":[
                         "S3Bucket",
                         "S3Key",
                         "Handler"
                     ]
                 },
                 {
-                    "required": [
+                    "required":[
                         "Script",
                         "Handler"
                     ]
@@ -148,14 +145,12 @@
                 },
                 "SubnetIds" : {
                     "type" : "array",
-                    "pattern": "^([0-9a-z_\\-]{0-16})$",
                     "items" : {
                         "type" : "string"
                     }
                 },
                 "SecurityGroupIds" : {
                     "type" : "array",
-                    "pattern": "^([0-9a-z_\\-]{0-5})$",
                     "items" : {
                         "type" : "string"
                     }
@@ -182,7 +177,7 @@
     "required": [
         "Name",
         "Code",
-        "ArtifactLocation",
+        "ArtifactS3Location",
         "ExecutionRoleArn",
         "Schedule",
         "RuntimeVersion",
@@ -191,26 +186,42 @@
     "handlers": {
         "create": {
             "permissions": [
+                "synthetics:CreateCanary",
+                "synthetics:StartCanary",
                 "s3:CreateBucket",
+                "s3:GetObject",
+                "s3:GetObjectVersion",
                 "s3:PutBucketEncryption",
                 "s3:PutEncryptionConfiguration",
-                "s3:GetBucketLocation",
+                "lambda:CreateFunction",
+                "lambda:AddPermission",
+                "lambda:PublishVersion",
+                "lambda:UpdateFunctionConfiguration",
+                "lambda:GetFunctionConfiguration",
+                "lambda:GetLayerVersionByArn",
+                "lambda:GetLayerVersion",
+                "lambda:PublishLayerVersion",
+                "ec2:DescribeVpcs",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeSecurityGroups",
                 "iam:PassRole"
             ]
         },
         "update": {
             "permissions": [
-                "s3:CreateBucket",
-                "s3:PutBucketEncryption",
-                "s3:PutEncryptionConfiguration",
-                "s3:GetBucketLocation",
-                "iam:PassRole"
+                "synthetics:UpdateCanary",
+                "synthetics:StartCanary",
+                "synthetics:TagResource"
             ]
         },
         "read": {
             "permissions": [
-                "synthetics:ListCanaries",
-                "synthetics:DescribeCanaries"
+                "synthetics:GetCanary",
+                "synthetics:DescribeCanaries",
+                "synthetics:ListTagsForResource",
+                "iam:ListRoles",
+                "s3:ListAllMyBuckets",
+                "s3:GetBucketLocation"
             ]
         },
         "delete": {

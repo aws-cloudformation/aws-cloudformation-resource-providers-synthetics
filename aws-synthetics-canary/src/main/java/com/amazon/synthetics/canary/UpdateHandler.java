@@ -18,7 +18,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public class UpdateHandler extends BaseHandler<CallbackContext> {
-    private static final int CALLBACK_DELAY_SECONDS = 30;
+    private static final int CALLBACK_DELAY_SECONDS = 10;
     private static final int MAX_RETRY_TIMES = 10; // 5min * 60 / 30 = 10
 
     Logger logger;
@@ -77,10 +77,11 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
 
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
                 .handler(model.getCode().getHandler())
-                .s3Bucket(model.getCode().getS3Bucket())
-                .s3Key(model.getCode().getS3Bucket())
-                .s3Version(model.getCode().getS3ObjectVersion())
-                .zipFile(ModelHelper.compressRawScript(model.getCode())).build();
+                .s3Bucket(model.getCode().getS3Bucket() != null ? model.getCode().getS3Bucket() : null)
+                .s3Key(model.getCode().getS3Key() != null ? model.getCode().getS3Key() : null )
+                .s3Version(model.getCode().getS3ObjectVersion() != null ? model.getCode().getS3ObjectVersion() : null )
+                .zipFile(model.getCode().getScript() != null ? ModelHelper.compressRawScript(model.getCode()) : null)
+                .build();
 
         final CanaryScheduleInput canaryScheduleInput = CanaryScheduleInput.builder()
                 .expression(model.getSchedule().getExpression())
@@ -103,7 +104,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         final UpdateCanaryRequest updateCanaryRequest = UpdateCanaryRequest.builder()
                 .name(model.getName())
                 .code(canaryCodeInput)
-                .executionRoleArn(model.getExecutionIAMRoleArn())
+                .executionRoleArn(model.getExecutionRoleArn())
                 .runtimeVersion(model.getRuntimeVersion())
                 .schedule(canaryScheduleInput)
                 .runConfig(canaryRunConfigInput)
@@ -144,7 +145,6 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                     .callbackContext(callbackContext)
                     .resourceModel(modelOutput)
                     .status(OperationStatus.SUCCESS)
-                    .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
                     .build();
         } else {
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
@@ -172,7 +172,6 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             Canary canary = getCanaryResponse.canary();
             String canaryState = canary.status().stateAsString();
             if (canaryState.compareTo(CanaryStates.UPDATING.toString()) != 0) {
-                logger.log("Not in Updating Stage..");
                 modelOutput = ModelHelper.constructModel(canary, model);
                 return true;
             }
