@@ -10,7 +10,7 @@ import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
 import software.amazon.cloudformation.proxy.*;
 
 public class DeleteHandler extends BaseHandler<CallbackContext> {
-    private static final int CALLBACK_DELAY_SECONDS = 30;
+    private static final int CALLBACK_DELAY_SECONDS = 5;
     private static final int MAX_RETRY_TIMES = 4; // 2min * 60 / 30 = 4
     Logger logger;
     private AmazonWebServicesClientProxy clientProxy;
@@ -45,13 +45,13 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                                                                                         final ResourceHandlerRequest<ResourceModel> request,
                                                                                         final SyntheticsClient syntheticsClient) {
         // Start delete canary action
-        if(!callbackContext.isCanaryDeleteStarted()) {
-            return deleteCanary( model, callbackContext, proxy, request, syntheticsClient);
+        if (!callbackContext.isCanaryDeleteStarted()) {
+            return deleteCanary(model, callbackContext, proxy, request, syntheticsClient);
         }
 
         //Canary deletion has started. Wait for deletion to stabilize
-        if(callbackContext.isCanaryDeleteStarted() && !callbackContext.isCanaryDeleteStabilized()) {
-            return updateCanaryDeleteProgress( model, callbackContext, proxy, request, syntheticsClient);
+        if (callbackContext.isCanaryDeleteStarted() && !callbackContext.isCanaryDeleteStabilized()) {
+            return updateCanaryDeleteProgress(model, callbackContext, proxy, request, syntheticsClient);
         }
 
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
@@ -76,11 +76,16 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
         try {
             getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
             String canaryState = getCanaryResponse.canary().status().stateAsString();
-            if (canaryState.compareTo(CanaryStates.STOPPED.toString()) != 0){
-                throw new CfnInvalidRequestException("Canary is in "+ canaryState + "state and cannot be deleted. Please stop the canary before deletion");
+            if (canaryState.compareTo(CanaryStates.RUNNING.toString()) == 0) {
+                throw new CfnInvalidRequestException("Canary is in " + canaryState + "state and cannot be deleted. Please stop the canary before deletion");
             }
             proxy.injectCredentialsAndInvokeV2(deleteCanaryRequest, syntheticsClient::deleteCanary);
-        } catch (final ConcurrentModificationException e) {
+        } catch (final ResourceNotFoundException resourceNotFoundException) {
+            logger.log(String.format("%s [%s] is already deleted",
+                    ResourceModel.TYPE_NAME, model.getName()));
+            return ProgressEvent.defaultSuccessHandler(null);
+        }
+        catch (final ConcurrentModificationException e) {
             throw new AmazonServiceException(e.getMessage());
         } catch (final ValidationException e) {
             throw new CfnGeneralServiceException(e.getMessage());
@@ -96,27 +101,30 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
     }
 
     private ProgressEvent<ResourceModel, CallbackContext> updateCanaryDeleteProgress(final ResourceModel model,
-                                                                                       final CallbackContext callbackContext,
-                                                                                       final AmazonWebServicesClientProxy proxy,
-                                                                                       final ResourceHandlerRequest<ResourceModel> request,
-                                                                                       final SyntheticsClient syntheticsClient
+                                                                                     final CallbackContext callbackContext,
+                                                                                     final AmazonWebServicesClientProxy proxy,
+                                                                                     final ResourceHandlerRequest<ResourceModel> request,
+                                                                                     final SyntheticsClient syntheticsClient
     ) {
         boolean canaryDeletionState = checkDeleteStabilization(model, proxy, callbackContext, syntheticsClient);
         callbackContext.setCanaryCreationStablized(canaryDeletionState);
         callbackContext.incrementRetryTimes();
         OperationStatus operationStatus;
 
-        if(canaryDeletionState) {
-            operationStatus = OperationStatus.SUCCESS;
+        if (canaryDeletionState) {
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .callbackContext(callbackContext)
+                    .resourceModel(model)
+                    .status(OperationStatus.SUCCESS)
+                    .build();
         } else {
-            operationStatus = OperationStatus.IN_PROGRESS;
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .callbackContext(callbackContext)
+                    .resourceModel(model)
+                    .status(OperationStatus.IN_PROGRESS)
+                    .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
+                    .build();
         }
-        return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .callbackContext(callbackContext)
-                .resourceModel(model)
-                .status(operationStatus)
-                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
-                .build();
     }
 
     private boolean checkDeleteStabilization(final ResourceModel model,

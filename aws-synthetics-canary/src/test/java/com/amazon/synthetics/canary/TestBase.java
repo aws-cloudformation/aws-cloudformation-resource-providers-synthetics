@@ -12,9 +12,9 @@ public class TestBase {
     public static ResourceModel buildModelForRead() {
         ResourceModel model = ResourceModel.builder()
                 .name("cfncanary-unittest")
-                .artifactLocation("cw-syn-results-440056434621-us-west-2/canary/canary-1254-38b-0a58c26fe372")
+                .artifactS3Location("cw-syn-results-440056434621-us-west-2/canary/canary-1254-38b-0a58c26fe372")
                 .code(codeObjectForTesting())
-                .executionIAMRoleArn("arn:aws:us-east-1:1234567891000:role/SyntheticsRole")
+                .executionRoleArn("arn:aws:us-east-1:1234567891000:role/SyntheticsRole")
                 .schedule(scheduleObjectForTesting())
                 .runtimeVersion("syn-1.0")
                 .vPCConfig(vpcConfigForTesting())

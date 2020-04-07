@@ -1,6 +1,5 @@
 package com.amazon.synthetics.canary;
 
-import com.amazonaws.services.cloudfront.model.Tags;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
@@ -17,7 +16,8 @@ import java.util.Map;
 public class CreateHandler extends BaseHandler<CallbackContext> {
     private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
     private static final String JS_SUFFIX = ".js";
-    private static final int CALLBACK_DELAY_SECONDS = 30;
+    private static final int DEFAULT_CALLBACK_DELAY_SECONDS = 5;
+    private static final int CALLBACK_DELAY_SECONDS_FOR_RUNNING_STATE = 30;
     private static final int MAX_RETRY_TIMES = 10; // 5min * 60 / 30 = 10
 
     Logger logger;
@@ -104,12 +104,11 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
 
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
                 .handler(model.getCode().getHandler())
-                .s3Bucket(model.getCode().getS3Bucket())
-                .s3Key(model.getCode().getS3Bucket())
-                .s3Version(model.getCode().getS3ObjectVersion())
-                .zipFile(ModelHelper.compressRawScript(model.getCode())).build();
-
-        logger.log("\n script: " + model.getCode().getScript());
+                .s3Bucket(model.getCode().getS3Bucket() != null ? model.getCode().getS3Bucket() : null)
+                .s3Key(model.getCode().getS3Key() != null ? model.getCode().getS3Key() : null )
+                .s3Version(model.getCode().getS3ObjectVersion() != null ? model.getCode().getS3ObjectVersion() : null )
+                .zipFile(model.getCode().getScript() != null ? ModelHelper.compressRawScript(model.getCode()) : null)
+                .build();
 
         final CanaryScheduleInput canaryScheduleInput = CanaryScheduleInput.builder()
                 .expression(model.getSchedule().getExpression())
@@ -131,9 +130,9 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
 
         final CreateCanaryRequest createCanaryRequest = CreateCanaryRequest.builder()
                 .name(model.getName())
-                .executionRoleArn(model.getExecutionIAMRoleArn())
+                .executionRoleArn(model.getExecutionRoleArn())
                 .schedule(canaryScheduleInput)
-                .artifactLocation(model.getArtifactLocation())
+                .artifactLocation(model.getArtifactS3Location())
                 .runtimeVersion(model.getRuntimeVersion())
                 .code(canaryCodeInput)
                 .tags(buildTagInput(model))
@@ -155,7 +154,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                 .callbackContext(callbackContext)
                 .resourceModel(model)
                 .status(OperationStatus.IN_PROGRESS)
-                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
+                .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
                 .build();
     }
 
@@ -172,25 +171,21 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         Canary canary;
 
         if (canaryCreationState && !model.getStartCanaryAfterCreation()) {
-            operationStatus = OperationStatus.SUCCESS;
             canary = getCanaryRecord(model,
                     proxy,
                     syntheticsClient);
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
                     .callbackContext(callbackContext)
                     .resourceModel(ModelHelper.constructModel(canary, model))
-                    .status(operationStatus)
-                    .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
+                    .status(OperationStatus.SUCCESS)
                     .build();
-        } else {
-            operationStatus = OperationStatus.IN_PROGRESS;
         }
 
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .callbackContext(callbackContext)
                 .resourceModel(model)
-                .status(operationStatus)
-                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
+                .status(OperationStatus.IN_PROGRESS)
+                .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
                 .build();
     }
 
@@ -200,10 +195,10 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                                              final SyntheticsClient syntheticsClient) {
         if (callbackContext.getStabilizationRetryTimes() >= MAX_RETRY_TIMES)
             throw new CfnNotStabilizedException(ResourceModel.TYPE_NAME, model.getName());
-        Canary canary = getCanaryRecord(model,
-                proxy,
-                syntheticsClient);
         try {
+            Canary canary = getCanaryRecord(model,
+                    proxy,
+                    syntheticsClient);
             if (canary.status().stateAsString().compareTo(CanaryStates.READY.toString()) == 0) {
                 return true;
             }
@@ -218,6 +213,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                                                                       final AmazonWebServicesClientProxy proxy,
                                                                       final ResourceHandlerRequest<ResourceModel> request,
                                                                       final SyntheticsClient syntheticsClient) {
+        callbackContext.setCanaryStartStarted(true);
         final StartCanaryRequest startCanaryRequest = StartCanaryRequest.builder()
                 .name(model.getName()).build();
         try {
@@ -225,12 +221,11 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         } catch (final InternalServerException e) {
             throw new CfnGeneralServiceException(ResourceModel.TYPE_NAME + e.getMessage());
         }
-        callbackContext.setCanaryStartStarted(true);
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .callbackContext(callbackContext)
                 .resourceModel(model)
                 .status(OperationStatus.IN_PROGRESS)
-                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
+                .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
                 .build();
     }
 
@@ -239,27 +234,26 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                                                                                     final AmazonWebServicesClientProxy proxy,
                                                                                     final ResourceHandlerRequest<ResourceModel> request,
                                                                                     final SyntheticsClient syntheticsClient) {
-
         boolean canaryStartingState = checkCanaryStartStabilization(model, proxy, callbackContext, syntheticsClient);
         callbackContext.setCanaryStartStablized(canaryStartingState);
         callbackContext.incrementRetryTimes();
         OperationStatus operationStatus;
 
-        if (canaryStartingState) {
-            operationStatus = OperationStatus.SUCCESS;
-        } else {
-            operationStatus = OperationStatus.IN_PROGRESS;
-        }
-
         Canary canary = getCanaryRecord(model,
                 proxy,
                 syntheticsClient);
-
+        if (canaryStartingState) {
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .callbackContext(callbackContext)
+                    .resourceModel(ModelHelper.constructModel(canary, model))
+                    .status(OperationStatus.SUCCESS)
+                    .build();
+        }
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .callbackContext(callbackContext)
                 .resourceModel(ModelHelper.constructModel(canary, model))
-                .status(operationStatus)
-                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
+                .status(OperationStatus.IN_PROGRESS)
+                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS_FOR_RUNNING_STATE)
                 .build();
     }
 
@@ -280,6 +274,8 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             String canaryState = getCanaryResponse.canary().status().stateAsString();
             if (canaryState.compareTo(CanaryStates.RUNNING.toString()) == 0
                     || canaryState.compareTo(CanaryStates.STOPPED.toString()) == 0) {
+                logger.log(String.format("Canary has successfully entered the %s state" ,
+                        CanaryStates.RUNNING.toString()));
                 return true;
             }
         } catch (final ResourceNotFoundException e) {
@@ -292,7 +288,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         Map<String, String> tagMap = new HashMap<>();
         List<Tag> tagList = new ArrayList<Tag>();
         tagList = model.getTags();
-        // return null if no Tag specified. (Optional)
+        // return null if no Tag specified.
         if (tagList == null ) return null;
 
         for(Tag tag: tagList) {
