@@ -1,6 +1,5 @@
 package com.amazon.synthetics.canary;
 
-import com.amazonaws.services.cloudfront.model.Tags;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
