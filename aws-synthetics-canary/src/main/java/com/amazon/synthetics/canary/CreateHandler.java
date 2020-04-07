@@ -274,7 +274,8 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             String canaryState = getCanaryResponse.canary().status().stateAsString();
             if (canaryState.compareTo(CanaryStates.RUNNING.toString()) == 0
                     || canaryState.compareTo(CanaryStates.STOPPED.toString()) == 0) {
-                logger.log("Canary is in "+ CanaryStates.RUNNING.toString() + " state and returning TRUE");
+                logger.log(String.format("Canary has successfully entered the %s state" ,
+                        CanaryStates.RUNNING.toString()));
                 return true;
             }
         } catch (final ResourceNotFoundException e) {
