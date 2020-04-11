@@ -132,7 +132,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                 .name(model.getName())
                 .executionRoleArn(model.getExecutionRoleArn())
                 .schedule(canaryScheduleInput)
-                .artifactLocation(model.getArtifactS3Location())
+                .artifactS3Location(model.getArtifactS3Location())
                 .runtimeVersion(model.getRuntimeVersion())
                 .code(canaryCodeInput)
                 .tags(buildTagInput(model))

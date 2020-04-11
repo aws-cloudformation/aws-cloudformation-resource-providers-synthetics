@@ -75,7 +75,7 @@ public class TestBase {
     public static Canary canaryResponseObjectForTesting(String canaryName) {
         Canary cfnCanary = Canary.builder()
                 .name(canaryName)
-                .artifactLocation("cw-syn-results-440056434621-us-west-2/canary/canary-1254-38b-0a58c26fe372")
+                .artifactS3Location("cw-syn-results-440056434621-us-west-2/canary/canary-1254-38b-0a58c26fe372")
                 .code(codeOutputObjectForTesting())
                 .engineArn("arn:aws:us-east-1:123456789101:function:testFunction:1")
                 .executionRoleArn("arn:aws:us-east-1:1234567891000:role/SyntheticsRole")
