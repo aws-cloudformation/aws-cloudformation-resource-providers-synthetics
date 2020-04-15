@@ -135,7 +135,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                 .artifactS3Location(model.getArtifactS3Location())
                 .runtimeVersion(model.getRuntimeVersion())
                 .code(canaryCodeInput)
-                .tags(buildTagInput(model))
+                .tags(ModelHelper.buildTagInputMap(model))
                 .vpcConfig(vpcConfigInput)
                 .failureRetentionPeriodInDays(model.getFailureRetentionPeriod())
                 .successRetentionPeriodInDays(model.getSuccessRetentionPeriod())
@@ -282,19 +282,6 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             return false;
         }
         return false;
-    }
-
-    public Map<String, String> buildTagInput(ResourceModel model) {
-        Map<String, String> tagMap = new HashMap<>();
-        List<Tag> tagList = new ArrayList<Tag>();
-        tagList = model.getTags();
-        // return null if no Tag specified.
-        if (tagList == null ) return null;
-
-        for(Tag tag: tagList) {
-            tagMap.put(tag.getKey(), tag.getValue());
-        }
-        return tagMap;
     }
 
     // Get the canary metadata that got created.

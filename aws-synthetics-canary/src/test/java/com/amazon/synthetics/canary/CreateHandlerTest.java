@@ -9,6 +9,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.proxy.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -77,6 +82,12 @@ public class CreateHandlerTest extends TestBase{
         scheduleForTesting.setDurationInSeconds("3600");
         scheduleForTesting.setExpression("rate(1 min)");
 
+        Map<String, String> tagMap = new HashMap<>();
+        tagMap.put("key1", "value1");
+        Tag tagAtCreation = Tag.builder().key("key1").value("value1").build();
+        List<Tag> listTag = new ArrayList<>();
+        listTag.add(tagAtCreation);
+
 
         model = ResourceModel.builder()
                 .name(String.format("canary_created_from_cloudformation-" + new DateTime().toString()))
@@ -86,6 +97,7 @@ public class CreateHandlerTest extends TestBase{
                 .schedule(scheduleForTesting)
                 .runtimeVersion("syn-1.0")
                 .startCanaryAfterCreation(true)
+                .tags(listTag)
                 .runConfig(RunConfig.builder().timeoutInSeconds(60).build())
                 .successRetentionPeriod(31)
                 .failureRetentionPeriod(31)
@@ -121,7 +133,12 @@ public class CreateHandlerTest extends TestBase{
                 .canary(canary)
                 .build();
 
-        doReturn(getCanaryResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
+        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
+
+        doReturn(getCanaryResponse,
+                tagResourceResponse)
+                .when(proxy)
+                .injectCredentialsAndInvokeV2(any(), any());
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
 
