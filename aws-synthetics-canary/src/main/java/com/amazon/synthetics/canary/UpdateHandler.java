@@ -1,21 +1,11 @@
 package com.amazon.synthetics.canary;
 
-import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
 import software.amazon.cloudformation.exceptions.CfnInvalidRequestException;
 import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
 import software.amazon.cloudformation.proxy.*;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 public class UpdateHandler extends BaseHandler<CallbackContext> {
     private static final int CALLBACK_DELAY_SECONDS = 10;
@@ -115,6 +105,15 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
 
         try {
             proxy.injectCredentialsAndInvokeV2(updateCanaryRequest, syntheticsClient::updateCanary);
+            // if tags need to be updated then we need to call TagResourceRequest
+            if (model.getTags() != null ) {
+                TagResourceRequest tagResourceRequest = TagResourceRequest.builder()
+                        .resourceArn(ModelHelper.buildCanaryArn(request, model.getName()))
+                        .tags(ModelHelper.buildTagInputMap(model))
+                        .build();
+                proxy.injectCredentialsAndInvokeV2(tagResourceRequest, syntheticsClient::tagResource);
+            }
+
         } catch (final ValidationException e) {
             throw new CfnInvalidRequestException(e.getMessage());
         } catch (final Exception e) {

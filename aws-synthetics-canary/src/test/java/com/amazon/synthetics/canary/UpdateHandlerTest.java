@@ -10,6 +10,9 @@ import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.proxy.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -90,6 +93,12 @@ public class UpdateHandlerTest {
         vpcConfig.setSubnetIds(subnetIds);
         vpcConfig.setSecurityGroupIds(securityGroups);
 
+        Map<String, String> tagMap = new HashMap<>();
+        tagMap.put("key2", "value2");
+        Tag tagUpdate = Tag.builder().key("key2").value("value2").build();
+        List<Tag> listTag = new ArrayList<>();
+        listTag.add(tagUpdate);
+
         RunConfig runConfig = RunConfig.builder().timeoutInSeconds(600).build();
 
         model = ResourceModel.builder()
@@ -101,6 +110,7 @@ public class UpdateHandlerTest {
                 .runtimeVersion("syn-1.0")
                 .startCanaryAfterCreation(true)
                 .vPCConfig(vpcConfig)
+                .tags(listTag)
                 .runConfig(runConfig)
                 .failureRetentionPeriod(31)
                 .successRetentionPeriod(31)

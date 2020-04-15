@@ -1,5 +1,6 @@
 package com.amazon.synthetics.canary;
 
+import com.amazonaws.arn.Arn;
 import com.google.common.base.Strings;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.synthetics.model.*;
@@ -15,6 +16,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import software.amazon.cloudformation.proxy.Logger;
+import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
 
 public class ModelHelper {
@@ -111,6 +113,35 @@ public class ModelHelper {
             ioe.printStackTrace();
         }
         return SdkBytes.fromByteBuffer(ByteBuffer.wrap(byteArrayOutputStream.toByteArray()));
+    }
+
+    public static String buildCanaryArn(ResourceHandlerRequest<ResourceModel> request, String canaryName) {
+        String accountId  = request.getAwsAccountId();
+        String region = request.getRegion();
+        String resource = String.format("%s:%s", "canary", canaryName);
+        final String partition = "aws";
+        if (region.contains("us-gov-")) partition.concat("-us-gov");
+        if (region.contains("cn-")) partition.concat("-cn");
+
+        Arn arn = Arn.builder().withAccountId(accountId)
+                .withPartition(partition)
+                .withRegion(region)
+                .withService("synthetics")
+                .withResource(resource)
+                .build();
+        return arn.toString();
+    }
+
+    public static Map<String, String> buildTagInputMap(ResourceModel model) {
+        Map<String, String> tagMap = new HashMap<>();
+        List<Tag> tagList = model.getTags();
+        // return null if no Tag specified.
+        if (tagList == null ) return null;
+
+        for(Tag tag: tagList) {
+            tagMap.put(tag.getKey(), tag.getValue());
+        }
+        return tagMap;
     }
 }
 
