@@ -3,6 +3,7 @@ package com.amazon.synthetics.canary;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
+import software.amazon.cloudformation.exceptions.CfnInternalFailureException;
 import software.amazon.cloudformation.exceptions.CfnInvalidRequestException;
 import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
 import software.amazon.cloudformation.proxy.*;
@@ -45,12 +46,12 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                                                                                         final ResourceHandlerRequest<ResourceModel> request,
                                                                                         final SyntheticsClient syntheticsClient) {
         // Update Canary
-        if(!callbackContext.isCanaryUpdationStarted()) {
-            return updateCanary( model, callbackContext, proxy, request, syntheticsClient);
+        if (!callbackContext.isCanaryUpdationStarted()) {
+            return updateCanary(model, callbackContext, proxy, request, syntheticsClient);
         }
 
         //Update creation started. Check for stabilization.
-        if(callbackContext.isCanaryUpdationStarted() && !callbackContext.isCanaryUpdationStablized()) {
+        if (callbackContext.isCanaryUpdationStarted() && !callbackContext.isCanaryUpdationStablized()) {
             return updateCanaryUpdationProgress(model, callbackContext, proxy, request, syntheticsClient);
         }
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
@@ -68,8 +69,8 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
                 .handler(model.getCode().getHandler())
                 .s3Bucket(model.getCode().getS3Bucket() != null ? model.getCode().getS3Bucket() : null)
-                .s3Key(model.getCode().getS3Key() != null ? model.getCode().getS3Key() : null )
-                .s3Version(model.getCode().getS3ObjectVersion() != null ? model.getCode().getS3ObjectVersion() : null )
+                .s3Key(model.getCode().getS3Key() != null ? model.getCode().getS3Key() : null)
+                .s3Version(model.getCode().getS3ObjectVersion() != null ? model.getCode().getS3ObjectVersion() : null)
                 .zipFile(model.getCode().getScript() != null ? ModelHelper.compressRawScript(model.getCode()) : null)
                 .build();
 
@@ -84,7 +85,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         // VPC Config optional
         VpcConfigInput vpcConfigInput = null;
 
-        if (model.getVPCConfig() != null ){
+        if (model.getVPCConfig() != null) {
             vpcConfigInput = VpcConfigInput.builder()
                     .subnetIds(model.getVPCConfig().getSubnetIds())
                     .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
@@ -103,15 +104,34 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 .vpcConfig(vpcConfigInput)
                 .build();
 
+        final Canary canary = getCanaryRecord(model, proxy, syntheticsClient);
+        final String canaryState = canary.status().stateAsString();
+
         try {
             proxy.injectCredentialsAndInvokeV2(updateCanaryRequest, syntheticsClient::updateCanary);
             // if tags need to be updated then we need to call TagResourceRequest
-            if (model.getTags() != null ) {
+            if (model.getTags() != null) {
                 TagResourceRequest tagResourceRequest = TagResourceRequest.builder()
                         .resourceArn(ModelHelper.buildCanaryArn(request, model.getName()))
                         .tags(ModelHelper.buildTagInputMap(model))
                         .build();
                 proxy.injectCredentialsAndInvokeV2(tagResourceRequest, syntheticsClient::tagResource);
+            }
+
+            if (isCanaryInReadyOrStoppedState(model, canaryState, true)) {
+                StartCanaryRequest startCanaryRequest = StartCanaryRequest.builder()
+                        .name(model.getName()).build();
+
+                logger.log("Starting canary....: State : " + canary.status().stateAsString());
+                proxy.injectCredentialsAndInvokeV2(startCanaryRequest, syntheticsClient::startCanary);
+            }
+            
+            if (isCanaryInRunningState(model, canaryState, false)) {
+                logger.log("Stopping canary....: " + model.getName() + " in State : " + canary.status().stateAsString() + "\n");
+                StopCanaryRequest stopCanaryRequest = StopCanaryRequest.builder()
+                        .name(model.getName()).build();
+
+                proxy.injectCredentialsAndInvokeV2(stopCanaryRequest, syntheticsClient::stopCanary);
             }
 
         } catch (final ValidationException e) {
@@ -161,23 +181,60 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                                              final SyntheticsClient syntheticsClient) {
         if (callbackContext.getStabilizationRetryTimes() >= MAX_RETRY_TIMES)
             throw new CfnNotStabilizedException(ResourceModel.TYPE_NAME, model.getName());
-        final GetCanaryRequest getCanaryRequest  = GetCanaryRequest.builder()
+
+        try {
+            Canary canary = getCanaryRecord(model, proxy, syntheticsClient);
+            String canaryState = canary.status().stateAsString();
+            if (canaryState.compareTo(CanaryStates.UPDATING.toString()) != 0 &&
+                    (isCanaryInReadyOrStoppedState(model, canaryState, false)
+                            || isCanaryInRunningState(model, canaryState, true))) {
+
+                modelOutput = ModelHelper.constructModel(canary, model);
+                return true;
+            }
+        } catch (
+                final ResourceNotFoundException e) {
+            return false;
+        }
+        return false;
+    }
+
+    private boolean isCanaryInReadyOrStoppedState(ResourceModel model, String canaryState, boolean requiredEndState) {
+        /**
+         * If stack is updated setting getStartCanaryAfterCreation to false
+         * AND canary returns to READY or STOPPED state, return true.
+         */
+        return model.getStartCanaryAfterCreation() == requiredEndState
+                && (canaryState.compareTo(CanaryStates.READY.toString()) == 0
+                || canaryState.compareTo(CanaryStates.STOPPED.toString()) == 0);
+    }
+
+    private boolean isCanaryInRunningState(ResourceModel model, String canaryState, boolean requiredEndState) {
+        /**
+         * If stack is updated setting getStartCanaryAfterCreation to true
+         * AND canary is set to RUNNING state, return true.
+         */
+        return model.getStartCanaryAfterCreation() == requiredEndState
+                && (canaryState.compareTo(CanaryStates.RUNNING.toString()) == 0);
+    }
+
+
+    // Get the canary metadata
+    private Canary getCanaryRecord(final ResourceModel model,
+                                   final AmazonWebServicesClientProxy proxy,
+                                   final SyntheticsClient syntheticsClient) {
+        Canary canary;
+        final GetCanaryRequest getCanaryRequest = GetCanaryRequest.builder()
                 .name(model.getName())
                 .build();
         final GetCanaryResponse getCanaryResponse;
         try {
             getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest,
                     syntheticsClient::getCanary);
-            Canary canary = getCanaryResponse.canary();
-            String canaryState = canary.status().stateAsString();
-            if (canaryState.compareTo(CanaryStates.UPDATING.toString()) != 0) {
-                modelOutput = ModelHelper.constructModel(canary, model);
-                return true;
-            }
+            canary = getCanaryResponse.canary();
         } catch (final ResourceNotFoundException e) {
-            return false;
+            throw new CfnInternalFailureException();
         }
-        return false;
+        return canary;
     }
-
 }
