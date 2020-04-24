@@ -8,6 +8,8 @@ import software.amazon.cloudformation.exceptions.CfnInvalidRequestException;
 import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
 import software.amazon.cloudformation.proxy.*;
 
+import java.util.Map;
+
 public class UpdateHandler extends BaseHandler<CallbackContext> {
     private static final int CALLBACK_DELAY_SECONDS = 10;
     private static final int MAX_RETRY_TIMES = 10; // 5min * 60 / 30 = 10
@@ -17,6 +19,16 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
     private ResourceHandlerRequest<ResourceModel> request;
     private SyntheticsClient syntheticsClient;
     ResourceModel modelOutput;
+
+    private String handlerName;
+    private String scheduleExpression;
+    private String durationInSecs;
+    private Integer timeoutInSeconds;
+    private VpcConfigInput vpcConfigInput;
+    private String executionRoleArn;
+    private Integer successRetentionPeriodInDays;
+    private Integer failureRetentionPeriodInDays;
+    private Map<String, String> tags;
 
     @Override
     public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
@@ -34,7 +46,8 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 CallbackContext.builder()
                         .build() :
                 callbackContext;
-        syntheticsClient = ClientBuilder.getClient();
+        //syntheticsClient = ClientBuilder.getClient();
+        syntheticsClient=ClientBuilder.getClient("us-west-2","https://9za3kue24h.execute-api.us-west-2.amazonaws.com/test");
 
         // This Lambda will continually be re-invoked with the current state of the instance, finally succeeding when state stabilizes.
         return updateCanaryAndUpdateProgress(model, currentContext, proxy, request, syntheticsClient);
@@ -66,8 +79,74 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                                                                        final ResourceHandlerRequest<ResourceModel> request,
                                                                        final SyntheticsClient syntheticsClient) {
 
+        logger.log("Updating canary...");
+        final GetCanaryRequest getCanaryRequest = GetCanaryRequest.builder()
+                .name(model.getName())
+                .build();
+        final GetCanaryResponse getCanaryResponse;
+        try {
+            getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest,
+                    syntheticsClient::getCanary);
+            Canary canary = getCanaryResponse.canary();
+            handlerName = canary.code().handler();
+            scheduleExpression = canary.schedule().expression();
+            durationInSecs = canary.schedule().durationInSeconds().toString();
+            timeoutInSeconds = canary.runConfig().timeoutInSeconds();
+            successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
+            failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
+            executionRoleArn = canary.executionRoleArn();
+            VpcConfigOutput vpcConfig = canary.vpcConfig();
+            tags = canary.tags();
+
+            if (canary.code().handler().compareTo(model.getCode().getHandler()) != 0) {
+                logger.log("Updating handler");
+                handlerName = model.getCode().getHandler();
+            }
+
+            if (scheduleExpression.compareTo(model.getSchedule().getExpression()) != 0) {
+                logger.log("Updating scheduleExpression");
+                scheduleExpression = model.getSchedule().getExpression();
+            }
+
+            if (durationInSecs.compareTo(model.getSchedule().getDurationInSeconds()) != 0) {
+                logger.log("Updating durationInSecs");
+                durationInSecs = model.getSchedule().getDurationInSeconds();
+            }
+
+            if (timeoutInSeconds != model.getRunConfig().getTimeoutInSeconds()) {
+                logger.log("Updating timeoutInSeconds");
+                timeoutInSeconds = model.getRunConfig().getTimeoutInSeconds();
+            }
+
+            if (model.getVPCConfig() != null && !vpcConfig.equals(model.getVPCConfig())) {
+                logger.log("Updating vpcConfig");
+                vpcConfigInput = VpcConfigInput.builder()
+                        .subnetIds(model.getVPCConfig().getSubnetIds())
+                        .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
+                        .build();
+            }
+
+            if (successRetentionPeriodInDays != model.getSuccessRetentionPeriod()) {
+                logger.log("Updating successRetentionPeriodInDays");
+                successRetentionPeriodInDays = model.getSuccessRetentionPeriod();
+            }
+
+            if (failureRetentionPeriodInDays != model.getFailureRetentionPeriod()) {
+                logger.log("Updating failureRetentionPeriodInDays");
+                failureRetentionPeriodInDays = model.getFailureRetentionPeriod();
+            }
+
+            if (executionRoleArn.compareTo(model.getExecutionRoleArn()) != 0) {
+                logger.log("Updating executionRoleArn");
+                executionRoleArn = model.getExecutionRoleArn();
+            }
+
+        } catch (ResourceNotFoundException rfne) {
+            throw new CfnInvalidRequestException(rfne.getMessage());
+        }
+
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
-                .handler(model.getCode().getHandler())
+                .handler(handlerName)
                 .s3Bucket(model.getCode().getS3Bucket() != null ? model.getCode().getS3Bucket() : null)
                 .s3Key(model.getCode().getS3Key() != null ? model.getCode().getS3Key() : null)
                 .s3Version(model.getCode().getS3ObjectVersion() != null ? model.getCode().getS3ObjectVersion() : null)
@@ -75,28 +154,17 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 .build();
 
         final CanaryScheduleInput canaryScheduleInput = CanaryScheduleInput.builder()
-                .expression(model.getSchedule().getExpression())
-                .durationInSeconds(Long.valueOf((model.getSchedule().getDurationInSeconds()))).build();
+                .expression(scheduleExpression)
+                .durationInSeconds(Long.valueOf(durationInSecs)).build();
 
         final CanaryRunConfigInput canaryRunConfigInput = CanaryRunConfigInput.builder()
-                .timeoutInSeconds(model.getRunConfig().getTimeoutInSeconds())
+                .timeoutInSeconds(timeoutInSeconds)
                 .build();
-
-        // VPC Config optional
-        VpcConfigInput vpcConfigInput = null;
-
-        if (model.getVPCConfig() != null) {
-            vpcConfigInput = VpcConfigInput.builder()
-                    .subnetIds(model.getVPCConfig().getSubnetIds())
-                    .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
-                    .build();
-        }
 
         final UpdateCanaryRequest updateCanaryRequest = UpdateCanaryRequest.builder()
                 .name(model.getName())
                 .code(canaryCodeInput)
                 .executionRoleArn(model.getExecutionRoleArn())
-                .runtimeVersion(model.getRuntimeVersion())
                 .schedule(canaryScheduleInput)
                 .runConfig(canaryRunConfigInput)
                 .successRetentionPeriodInDays(model.getSuccessRetentionPeriod())
@@ -104,42 +172,35 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 .vpcConfig(vpcConfigInput)
                 .build();
 
-        final Canary canary = getCanaryRecord(model, proxy, syntheticsClient);
-        final String canaryState = canary.status().stateAsString();
-
         try {
             proxy.injectCredentialsAndInvokeV2(updateCanaryRequest, syntheticsClient::updateCanary);
             // if tags need to be updated then we need to call TagResourceRequest
             if (model.getTags() != null) {
-                TagResourceRequest tagResourceRequest = TagResourceRequest.builder()
-                        .resourceArn(ModelHelper.buildCanaryArn(request, model.getName()))
-                        .tags(ModelHelper.buildTagInputMap(model))
-                        .build();
-                proxy.injectCredentialsAndInvokeV2(tagResourceRequest, syntheticsClient::tagResource);
+                Map<String, Map<String, String>> tagResourceMap = ModelHelper.updateTags(model, tags);
+                logger.log("tagResourceMap: " + tagResourceMap);
+                if (tagResourceMap.get("ADD_TAGS") != null ) {
+                    logger.log("tagResourceMap: in ADD" + tagResourceMap);
+                    TagResourceRequest tagResourceRequest = TagResourceRequest.builder()
+                            .resourceArn(ModelHelper.buildCanaryArn(request, model.getName()))
+                            .tags(ModelHelper.updateTags(model, tags).get("ADD_TAGS"))
+                            .build();
+                    proxy.injectCredentialsAndInvokeV2(tagResourceRequest, syntheticsClient::tagResource);
+                }
+
+                if (tagResourceMap.get("REMOVE_TAGS") != null) {
+                    logger.log("tagResourceMap: in REMOVE" + tagResourceMap);
+                    UntagResourceRequest untagResourceRequest = UntagResourceRequest.builder()
+                            .resourceArn(ModelHelper.buildCanaryArn(request, model.getName()))
+                            .tagKeys(ModelHelper.updateTags(model, tags).get("REMOVE_TAGS").keySet())
+                            .build();
+                    proxy.injectCredentialsAndInvokeV2(untagResourceRequest, syntheticsClient::untagResource);
+                }
             }
-
-            if (isCanaryInReadyOrStoppedState(model, canaryState, true)) {
-                StartCanaryRequest startCanaryRequest = StartCanaryRequest.builder()
-                        .name(model.getName()).build();
-
-                logger.log("Starting canary....: State : " + canary.status().stateAsString());
-                proxy.injectCredentialsAndInvokeV2(startCanaryRequest, syntheticsClient::startCanary);
-            }
-            
-            if (isCanaryInRunningState(model, canaryState, false)) {
-                logger.log("Stopping canary....: " + model.getName() + " in State : " + canary.status().stateAsString() + "\n");
-                StopCanaryRequest stopCanaryRequest = StopCanaryRequest.builder()
-                        .name(model.getName()).build();
-
-                proxy.injectCredentialsAndInvokeV2(stopCanaryRequest, syntheticsClient::stopCanary);
-            }
-
         } catch (final ValidationException e) {
             throw new CfnInvalidRequestException(e.getMessage());
         } catch (final Exception e) {
             throw new CfnGeneralServiceException(e.getMessage());
         }
-
         callbackContext.setCanaryUpdationStarted(true);
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .callbackContext(callbackContext)
