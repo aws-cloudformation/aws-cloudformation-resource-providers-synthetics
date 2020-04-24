@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
-public class DeleteHandlerTest {
+public class DeleteHandlerTest extends TestBase{
     DeleteHandler handler;
 
     @Mock
@@ -39,7 +39,9 @@ public class DeleteHandlerTest {
 
         final CallbackContext callbackContext = CallbackContext.builder()
                 .canaryDeleteStarted(true)
-                .canaryDeleteStabilized(true).build();
+                .canaryDeleteStabilized(true)
+                .canaryStopStarted(true)
+                .canaryStopStabilized(true).build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response
             = handler.handleRequest(proxy, request, callbackContext, logger);
