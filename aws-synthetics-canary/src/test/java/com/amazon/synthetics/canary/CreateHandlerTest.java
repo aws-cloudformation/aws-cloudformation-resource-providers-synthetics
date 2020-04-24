@@ -22,8 +22,6 @@ import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 public class CreateHandlerTest extends TestBase{
-    private static String EXPECTED_TIMEOUT_MESSAGE = "Timed out waiting for the canary to become available";
-
     @Mock
     private AmazonWebServicesClientProxy proxy;
 

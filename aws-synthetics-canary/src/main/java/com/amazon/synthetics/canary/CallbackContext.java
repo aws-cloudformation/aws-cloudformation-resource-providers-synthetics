@@ -26,6 +26,9 @@ public class CallbackContext {
     private boolean canaryDeleteStarted;
     private boolean canaryDeleteStabilized;
 
+    private boolean canaryStopStarted;
+    private boolean canaryStopStabilized;
+
     @JsonPOJOBuilder(withPrefix = "")
     public static class CallbackContextBuilder {
     }

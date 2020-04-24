@@ -22,6 +22,8 @@ import java.util.zip.ZipOutputStream;
 public class ModelHelper {
     private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
     private static final String JS_SUFFIX = ".js";
+    private static String ADD_TAGS = "ADD_TAGS";
+    private static String REMOVE_TAGS = "REMOVE_TAGS";
 
     public static ResourceModel constructModel(Canary canary, ResourceModel model) {
         Map<String, String> tags = canary.tags();
@@ -155,13 +157,11 @@ public class ModelHelper {
     }
 
     public static Map<String, Map<String, String>> updateTags(ResourceModel model, Map<String, String> existingTags) {
-        System.out.println("Entering updateTags");
         Map<String, String> modelTagMap = new HashMap<>();
         List<Tag> modelTagList = model.getTags();
         Set<Map.Entry<String, String>> modelTagsES = null;
         Set<Map.Entry<String, String>> canaryTags = null;
         Set<Map.Entry<String, String>> modelTagsCopyES = null;
-
         Map<String, Map<String, String>> store = new HashMap<String, Map<String, String>>();
         Map<String, String> copyExistingTags = new HashMap<>(existingTags);
 
@@ -181,76 +181,38 @@ public class ModelHelper {
             return null;
         }
         Set<Map.Entry<String, String>> finalCanaryTags = canaryTags;
-
-        System.out.println(("Model tags: " + modelTagsES));
-        System.out.println(("ModelTagMap: " + modelTagMap));
         // Get an iterator
-        Iterator modelIterator = modelTagsES.iterator();
-
+        Iterator<Map.Entry<String, String>> modelIterator = modelTagsES.iterator();
         while (modelIterator.hasNext()) {
-            Map.Entry modelEntry = (Map.Entry) modelIterator.next();
-            System.out.println("modelEntry: " + modelEntry);
+            Map.Entry<String, String> modelEntry = modelIterator.next();
             if (finalCanaryTags.contains(modelEntry)) {
-                System.out.println("finalCanaryTags: " + finalCanaryTags);
-                System.out.println("modelEntry: " + modelEntry);
                 modelIterator.remove();
             }
         }
-        System.out.println(("tagMap after: " + modelTagMap));
-        store.put("ADD_TAGS", modelTagMap);
+        // Store all the tags that need to be added to the canary
+        store.put(ADD_TAGS, modelTagMap);
 
-        System.out.println("finalCanaryTags: " + modelTagsES);
-        System.out.println(("copyExistingTags before: " + copyExistingTags));
-        Iterator canaryTagIterator = finalCanaryTags.iterator();
-
+        Iterator<Map.Entry<String, String>> canaryTagIterator = finalCanaryTags.iterator();
         while (canaryTagIterator.hasNext()) {
-            Map.Entry canaryEntry = (Map.Entry) canaryTagIterator.next();
+            Map.Entry<String, String> canaryEntry = canaryTagIterator.next();
             try {
                 if (modelTagsCopyES.contains(canaryEntry)) {
+                    canaryTagIterator.remove();
+                }
+                if (canaryEntry.getKey().toString().startsWith("aws:")) {
+                    canaryTagIterator.remove();
+                }
+                if (!modelTagMap.isEmpty() && modelTagMap.containsKey(canaryEntry.getKey())) {
                     canaryTagIterator.remove();
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        System.out.println(("copyExistingTags after: " + copyExistingTags));
-        store.put("REMOVE_TAGS", copyExistingTags);
-
-
-   /*     if ((filterModelTagPairs ||
-                !filterModelTagPairs) && !modelTags.isEmpty()) {
-            store.put("ADD_TAGS", tagMap);
-        }
-
-        Set<Map.Entry<String, String>> finalModelTags = modelTagsCopy;
-        boolean filterCanaryTagPairs = canaryTags.removeIf(key -> key.getKey()
-                .equals(finalModelTags.contains(new HashMap().put(key, key.getKey()))));
-
-        if ((filterCanaryTagPairs ||
-                !filterCanaryTagPairs) && !canaryTags.isEmpty()) {
-            store.put("REMOVE_TAGS", copyExistingTags);
-        }*/
-        /*if (tagList == null || modelTags.containsAll(canaryTags)) {
-            return null;
-        }
-
-        if (modelTags.removeAll(canaryTags) || !modelTags.removeAll(canaryTags) ) {
-            // Tag these resources as these are additional
-            store.put("ADD_TAGS", tagMap);
-        }
-
-        if (canaryTags.removeAll(modelTagsCopy) || !canaryTags.removeAll(modelTags)) {
-            System.out.println("modelTags: check");
-            // Tag these resources as these are additional
-            System.out.println("modelTags: " + copyExistingTags);
-            System.out.println("modelTags: " + copyExistingTags.values());
-            store.put("REMOVE_TAGS", copyExistingTags);
-        }
-*/
-        System.out.println("\nstore: " + store.values());
+        // Store all the tags that need to be removed to the canary
+        store.put(REMOVE_TAGS, copyExistingTags);
         return store;
     }
-
 }
 
 

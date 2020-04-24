@@ -10,9 +10,7 @@ import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.proxy.*;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -21,9 +19,7 @@ import static org.mockito.Mockito.mock;
 
 
 @ExtendWith(MockitoExtension.class)
-public class UpdateHandlerTest {
-    private static String EXPECTED_TIMEOUT_MESSAGE = "Timed out waiting for the canary to become available";
-
+public class UpdateHandlerTest extends TestBase {
     @Mock
     private AmazonWebServicesClientProxy proxy;
 
@@ -93,8 +89,6 @@ public class UpdateHandlerTest {
         vpcConfig.setSubnetIds(subnetIds);
         vpcConfig.setSecurityGroupIds(securityGroups);
 
-        Map<String, String> tagMap = new HashMap<>();
-        tagMap.put("key2", "value2");
         Tag tagUpdate = Tag.builder().key("key2").value("value2").build();
         List<Tag> listTag = new ArrayList<>();
         listTag.add(tagUpdate);
@@ -125,10 +119,30 @@ public class UpdateHandlerTest {
                 .desiredResourceState(buildModel())
                 .build();
 
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .schedule(canaryScheduleOutputForTesting())
+                .build();
+
         final CallbackContext callbackContext = CallbackContext.builder()
                 .canaryUpdationStarted(true)
                 .canaryUpdationStablized(true)
+                .canaryStartStarted(true)
+                .canaryStartStablized(true)
+                .canaryStopStarted(true)
+                .canaryStopStabilized(true)
                 .build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
 
