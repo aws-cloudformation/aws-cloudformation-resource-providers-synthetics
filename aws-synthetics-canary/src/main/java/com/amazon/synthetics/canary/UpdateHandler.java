@@ -49,8 +49,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 CallbackContext.builder()
                         .build() :
                 callbackContext;
-        //syntheticsClient = ClientBuilder.getClient();
-        syntheticsClient = ClientBuilder.getClient("us-west-2", "https://9za3kue24h.execute-api.us-west-2.amazonaws.com/test");
+        syntheticsClient = ClientBuilder.getClient();
 
         // This Lambda will continually be re-invoked with the current state of the instance, finally succeeding when state stabilizes.
         return updateCanaryAndUpdateProgress(model, currentContext, proxy, request, syntheticsClient);
