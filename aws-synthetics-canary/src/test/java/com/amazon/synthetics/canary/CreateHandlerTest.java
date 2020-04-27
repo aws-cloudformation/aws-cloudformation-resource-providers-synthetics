@@ -185,7 +185,7 @@ public class CreateHandlerTest extends TestBase{
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(5);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();

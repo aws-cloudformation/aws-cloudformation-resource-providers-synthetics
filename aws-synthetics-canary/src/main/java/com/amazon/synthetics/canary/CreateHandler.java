@@ -16,7 +16,7 @@ import java.util.Map;
 public class CreateHandler extends BaseHandler<CallbackContext> {
     private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
     private static final String JS_SUFFIX = ".js";
-    private static final int DEFAULT_CALLBACK_DELAY_SECONDS = 5;
+    private static final int DEFAULT_CALLBACK_DELAY_SECONDS = 10;
     private static final int CALLBACK_DELAY_SECONDS_FOR_RUNNING_STATE = 30;
     private static final int MAX_RETRY_TIMES = 10; // 5min * 60 / 30 = 10
 

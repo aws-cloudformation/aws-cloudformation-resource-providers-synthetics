@@ -22,7 +22,8 @@
         },
         "ArtifactS3Location": {
             "description": "Provide the s3 bucket output location for test results",
-            "type": "string"
+            "type": "string",
+            "pattern": "^(s3|S3)://"
         },
         "Schedule": {
             "description": "Frequency to run your canaries",
@@ -211,7 +212,9 @@
             "permissions": [
                 "synthetics:UpdateCanary",
                 "synthetics:StartCanary",
-                "synthetics:TagResource"
+                "synthetics:StopCanary",
+                "synthetics:TagResource",
+                "synthetics:UntagResource"
             ]
         },
         "read": {
@@ -236,12 +239,13 @@
         }
     },
     "additionalProperties": false,
+    "createOnlyProperties": [
+        "/properties/Name"
+    ],
     "primaryIdentifier": [
-        "/properties/Name",
-        "/properties/Id"
+        "/properties/Name"
     ],
     "readOnlyProperties": [
-        "/properties/Name",
         "/properties/Id",
         "/properties/State"
     ]
