@@ -182,7 +182,8 @@
         "ExecutionRoleArn",
         "Schedule",
         "RuntimeVersion",
-        "StartCanaryAfterCreation"
+        "StartCanaryAfterCreation",
+        "RunConfig"
     ],
     "handlers": {
         "create": {
