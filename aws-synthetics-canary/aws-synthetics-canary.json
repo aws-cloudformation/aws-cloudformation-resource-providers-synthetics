@@ -57,7 +57,7 @@
             "$ref" : "#/definitions/VPCConfig"
         },
         "RunConfig": {
-            "description": "Provide maximum canary timeout per run in seconds ",
+            "description": "Provide canary run configuration",
             "$ref" : "#/definitions/RunConfig"
         },
         "StartCanaryAfterCreation": {
@@ -167,6 +167,11 @@
             "additionalProperties": false,
             "properties": {
                 "TimeoutInSeconds": {
+                    "description": "Provide maximum canary timeout per run in seconds",
+                    "type": "integer"
+                },
+                "MemoryInMB" : {
+                    "description": "Provide maximum memory available for canary in MB",
                     "type": "integer"
                 }
             },

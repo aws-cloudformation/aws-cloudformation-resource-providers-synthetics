@@ -26,6 +26,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
     private String scheduleExpression;
     private String durationInSecs;
     private Integer timeoutInSeconds;
+    private Integer memoryInMB;
     private VpcConfigInput vpcConfigInput;
     private String executionRoleArn;
     private Integer successRetentionPeriodInDays;
@@ -148,6 +149,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             scheduleExpression = canary.schedule().expression();
             durationInSecs = canary.schedule().durationInSeconds().toString();
             timeoutInSeconds = canary.runConfig().timeoutInSeconds();
+            memoryInMB = canary.runConfig().memoryInMB();
             successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
             failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
             executionRoleArn = canary.executionRoleArn();
@@ -173,6 +175,11 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             if (timeoutInSeconds != model.getRunConfig().getTimeoutInSeconds()) {
                 logger.log("Updating timeoutInSeconds");
                 timeoutInSeconds = model.getRunConfig().getTimeoutInSeconds();
+            }
+
+            if (model.getRunConfig() != null && model.getRunConfig().getMemoryInMB() != null && memoryInMB != model.getRunConfig().getMemoryInMB()){
+                logger.log("Updating memory");
+                memoryInMB = model.getRunConfig().getMemoryInMB();
             }
 
             if (model.getVPCConfig() != null && !vpcConfig.equals(model.getVPCConfig())) {
@@ -216,6 +223,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
 
         final CanaryRunConfigInput canaryRunConfigInput = CanaryRunConfigInput.builder()
                 .timeoutInSeconds(timeoutInSeconds)
+                .memoryInMB(memoryInMB)
                 .build();
 
         final UpdateCanaryRequest updateCanaryRequest = UpdateCanaryRequest.builder()
