@@ -96,7 +96,7 @@ public class CreateHandlerTest extends TestBase{
                 .runtimeVersion("syn-1.0")
                 .startCanaryAfterCreation(true)
                 .tags(listTag)
-                .runConfig(RunConfig.builder().timeoutInSeconds(60).build())
+                .runConfig(RunConfig.builder().timeoutInSeconds(60).memoryInMB(1024).build())
                 .successRetentionPeriod(31)
                 .failureRetentionPeriod(31)
                 .build();

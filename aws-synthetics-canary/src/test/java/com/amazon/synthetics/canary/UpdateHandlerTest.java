@@ -93,7 +93,7 @@ public class UpdateHandlerTest extends TestBase {
         List<Tag> listTag = new ArrayList<>();
         listTag.add(tagUpdate);
 
-        RunConfig runConfig = RunConfig.builder().timeoutInSeconds(600).build();
+        RunConfig runConfig = RunConfig.builder().timeoutInSeconds(600).memoryInMB(960).build();
 
         model = ResourceModel.builder()
                 .name(String.format("canary_created_from_cloudformation-" + new DateTime().toString()))

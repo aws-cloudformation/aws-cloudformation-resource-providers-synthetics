@@ -19,6 +19,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
     private static final int DEFAULT_CALLBACK_DELAY_SECONDS = 10;
     private static final int CALLBACK_DELAY_SECONDS_FOR_RUNNING_STATE = 30;
     private static final int MAX_RETRY_TIMES = 10; // 5min * 60 / 30 = 10
+    private  static final int DEFAULT_MEMORY_IN_MB = 960;
 
     Logger logger;
     private AmazonWebServicesClientProxy clientProxy;
@@ -113,9 +114,12 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         final CanaryScheduleInput canaryScheduleInput = CanaryScheduleInput.builder()
                 .expression(model.getSchedule().getExpression())
                 .durationInSeconds(Long.valueOf((model.getSchedule().getDurationInSeconds()))).build();
+        final int memoryInMb = model.getRunConfig() != null && model.getRunConfig().getMemoryInMB() != null ?
+                model.getRunConfig().getMemoryInMB() : DEFAULT_MEMORY_IN_MB;
 
         final CanaryRunConfigInput canaryRunConfigInput = CanaryRunConfigInput.builder()
                 .timeoutInSeconds(model.getRunConfig().getTimeoutInSeconds())
+                .memoryInMB(memoryInMb)
                 .build();
 
         // VPC Config optional
