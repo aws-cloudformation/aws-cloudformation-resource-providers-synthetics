@@ -20,9 +20,9 @@
 
     <dependencies>
        <dependency>
-           <groupId>com.amazonaws.services</groupId>
-           <artifactId>AWSSyntheticsJavaClient</artifactId>
-           <version>2.0-SNAPSHOT </version>
+           <groupId>software.amazon.awssdk</groupId>
+           <artifactId>synthetics</artifactId>
+           <version>2.13.23</version>
        </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>

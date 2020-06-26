@@ -145,6 +145,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest,
                     syntheticsClient::getCanary);
             Canary canary = getCanaryResponse.canary();
+
             handlerName = canary.code().handler();
             scheduleExpression = canary.schedule().expression();
             durationInSecs = canary.schedule().durationInSeconds().toString();
@@ -172,14 +173,16 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 durationInSecs = model.getSchedule().getDurationInSeconds();
             }
 
-            if (timeoutInSeconds != model.getRunConfig().getTimeoutInSeconds()) {
-                logger.log("Updating timeoutInSeconds");
-                timeoutInSeconds = model.getRunConfig().getTimeoutInSeconds();
-            }
+            if (model.getRunConfig() != null) {
+                if (timeoutInSeconds != model.getRunConfig().getTimeoutInSeconds()) {
+                    logger.log("Updating timeoutInSeconds");
+                    timeoutInSeconds = model.getRunConfig().getTimeoutInSeconds();
+                }
 
-            if (model.getRunConfig() != null && model.getRunConfig().getMemoryInMB() != null && memoryInMB != model.getRunConfig().getMemoryInMB()){
-                logger.log("Updating memory");
-                memoryInMB = model.getRunConfig().getMemoryInMB();
+                if (model.getRunConfig() != null && model.getRunConfig().getMemoryInMB() != null && memoryInMB != model.getRunConfig().getMemoryInMB()) {
+                    logger.log("Updating memory");
+                    memoryInMB = model.getRunConfig().getMemoryInMB();
+                }
             }
 
             if (model.getVPCConfig() != null && !vpcConfig.equals(model.getVPCConfig())) {

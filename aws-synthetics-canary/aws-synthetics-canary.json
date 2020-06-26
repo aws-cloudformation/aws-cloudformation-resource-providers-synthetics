@@ -77,7 +77,7 @@
                     "type" : "string"
                 }
             },
-            "required" : [ "Expression", "DurationInSeconds" ]
+            "required" : [ "Expression" ]
         },
         "Code" : {
             "type" : "object",
@@ -187,8 +187,7 @@
         "ExecutionRoleArn",
         "Schedule",
         "RuntimeVersion",
-        "StartCanaryAfterCreation",
-        "RunConfig"
+        "StartCanaryAfterCreation"
     ],
     "handlers": {
         "create": {
