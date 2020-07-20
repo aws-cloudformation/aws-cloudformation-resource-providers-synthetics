@@ -252,6 +252,13 @@
     ],
     "readOnlyProperties": [
         "/properties/Id",
-        "/properties/State"
+        "/properties/State",
+        "/properties/Code/SourceLocationArn"
+    ],
+    "writeOnlyProperties": [
+        "/properties/Code/S3Bucket",
+        "/properties/Code/S3Key",
+        "/properties/Code/S3ObjectVersion",
+        "/properties/Code/Script"
     ]
 }

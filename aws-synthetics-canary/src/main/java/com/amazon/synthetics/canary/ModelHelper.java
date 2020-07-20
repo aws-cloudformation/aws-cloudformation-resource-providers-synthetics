@@ -30,7 +30,7 @@ public class ModelHelper {
 
         model.setId(canary.id());
         model.setName(canary.name());
-        model.setArtifactS3Location(canary.artifactS3Location());
+        model.setArtifactS3Location("s3://" + canary.artifactS3Location());
         model.setExecutionRoleArn(canary.executionRoleArn());
         model.setFailureRetentionPeriod(canary.failureRetentionPeriodInDays());
         model.setSuccessRetentionPeriod(canary.successRetentionPeriodInDays());

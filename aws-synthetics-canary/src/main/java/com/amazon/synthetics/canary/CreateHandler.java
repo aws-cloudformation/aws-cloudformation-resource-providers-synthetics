@@ -1,11 +1,21 @@
 package com.amazon.synthetics.canary;
 
+import com.google.common.base.Strings;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
-import software.amazon.awssdk.services.synthetics.model.*;
-import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
-import software.amazon.cloudformation.exceptions.CfnInternalFailureException;
-import software.amazon.cloudformation.exceptions.CfnInvalidRequestException;
-import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
+import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
+import software.amazon.awssdk.services.synthetics.model.Canary;
+import software.amazon.awssdk.services.synthetics.model.CanaryCodeInput;
+import software.amazon.awssdk.services.synthetics.model.CanaryScheduleInput;
+import software.amazon.awssdk.services.synthetics.model.CanaryRunConfigInput;
+import software.amazon.awssdk.services.synthetics.model.VpcConfigInput;
+import software.amazon.awssdk.services.synthetics.model.CreateCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.ValidationException;
+import software.amazon.awssdk.services.synthetics.model.StartCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.InternalServerException;
+import software.amazon.awssdk.services.synthetics.model.GetCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.GetCanaryResponse;
+
+import software.amazon.cloudformation.exceptions.*;
 import software.amazon.cloudformation.proxy.*;
 
 import java.util.ArrayList;
@@ -111,8 +121,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                 .zipFile(model.getCode().getScript() != null ? ModelHelper.compressRawScript(model.getCode()) : null)
                 .build();
 
-
-        Long durationInSeconds = model.getSchedule().getDurationInSeconds() != null ?
+        Long durationInSeconds = !Strings.isNullOrEmpty(model.getSchedule().getDurationInSeconds()) ?
                 Long.valueOf(model.getSchedule().getDurationInSeconds()) : null;
 
         final CanaryScheduleInput canaryScheduleInput = CanaryScheduleInput.builder()
@@ -159,7 +168,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         try {
             proxy.injectCredentialsAndInvokeV2(createCanaryRequest, syntheticsClient::createCanary);
         } catch (final ValidationException e) {
-            throw new CfnInvalidRequestException(e.getMessage());
+            throw new CfnAlreadyExistsException(ResourceModel.TYPE_NAME, model.getPrimaryIdentifier().toString());
         } catch (final Exception e) {
             throw new CfnGeneralServiceException(e.getMessage());
         }
@@ -190,7 +199,6 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                     proxy,
                     syntheticsClient);
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .callbackContext(callbackContext)
                     .resourceModel(ModelHelper.constructModel(canary, model))
                     .status(OperationStatus.SUCCESS)
                     .build();
@@ -259,7 +267,6 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                 syntheticsClient);
         if (canaryStartingState) {
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .callbackContext(callbackContext)
                     .resourceModel(ModelHelper.constructModel(canary, model))
                     .status(OperationStatus.SUCCESS)
                     .build();

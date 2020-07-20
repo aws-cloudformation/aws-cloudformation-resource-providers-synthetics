@@ -6,6 +6,7 @@ import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
 import software.amazon.cloudformation.exceptions.CfnInvalidRequestException;
+import software.amazon.cloudformation.exceptions.CfnNotFoundException;
 import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
 import software.amazon.cloudformation.proxy.*;
 
@@ -88,9 +89,9 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             proxy.injectCredentialsAndInvokeV2(deleteCanaryRequest, syntheticsClient::deleteCanary);
             callbackContext.setCanaryDeleteStarted(true);
         } catch (final ResourceNotFoundException resourceNotFoundException) {
-            logger.log(String.format("%s [%s] is already deleted",
+            logger.log(String.format("%s [%s] is not found",
                     ResourceModel.TYPE_NAME, model.getName()));
-            return ProgressEvent.defaultSuccessHandler(null);
+            throw new CfnNotFoundException(ResourceModel.TYPE_NAME, model.getPrimaryIdentifier().toString());
         } catch (final ConcurrentModificationException e) {
             throw new AmazonServiceException(e.getMessage());
         } catch (final ValidationException e) {
@@ -123,9 +124,9 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                 proxy.injectCredentialsAndInvokeV2(stopCanaryRequest, syntheticsClient::stopCanary);
             }
         } catch (final ResourceNotFoundException resourceNotFoundException) {
-            logger.log(String.format("%s [%s] is already deleted",
+            logger.log(String.format("%s [%s] is not found",
                     ResourceModel.TYPE_NAME, model.getName()));
-            return ProgressEvent.defaultSuccessHandler(null);
+            throw new CfnNotFoundException(ResourceModel.TYPE_NAME, model.getPrimaryIdentifier().toString());
         } catch (final ConcurrentModificationException e) {
             throw new AmazonServiceException(e.getMessage());
         } catch (final ValidationException e) {
@@ -171,7 +172,6 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
 
         if (canaryDeletionState) {
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .callbackContext(callbackContext)
                     .resourceModel(model)
                     .status(OperationStatus.SUCCESS)
                     .build();
@@ -195,7 +195,7 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
         GetCanaryRequest getCanaryRequest = GetCanaryRequest.builder().name(model.getName()).build();
 
         try {
-            GetCanaryResponse getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
+            proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
         } catch (final ResourceNotFoundException e) {
             // If canary is not found, then it has been successfully deleted.
             logger.log("Canary: " + getCanaryRequest.name() + "not found and is successfully deleted");

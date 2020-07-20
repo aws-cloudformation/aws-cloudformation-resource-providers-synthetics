@@ -2,11 +2,10 @@ package com.amazon.synthetics.canary;
 
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
-import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
-import software.amazon.cloudformation.exceptions.CfnInternalFailureException;
-import software.amazon.cloudformation.exceptions.CfnInvalidRequestException;
-import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
+import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
+import software.amazon.cloudformation.exceptions.*;
 import software.amazon.cloudformation.proxy.*;
+import com.google.common.base.Strings;
 
 import java.util.Map;
 
@@ -179,18 +178,23 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                     timeoutInSeconds = model.getRunConfig().getTimeoutInSeconds();
                 }
 
-                if (model.getRunConfig() != null && model.getRunConfig().getMemoryInMB() != null && memoryInMB != model.getRunConfig().getMemoryInMB()) {
+                if (model.getRunConfig().getMemoryInMB() != null && memoryInMB != model.getRunConfig().getMemoryInMB()) {
                     logger.log("Updating memory");
                     memoryInMB = model.getRunConfig().getMemoryInMB();
                 }
             }
 
-            if (model.getVPCConfig() != null && !vpcConfig.equals(model.getVPCConfig())) {
-                logger.log("Updating vpcConfig");
-                vpcConfigInput = VpcConfigInput.builder()
-                        .subnetIds(model.getVPCConfig().getSubnetIds())
-                        .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
-                        .build();
+            if (model.getVPCConfig() != null) {
+                if (model.getVPCConfig().getSubnetIds() != null &&
+                        !model.getVPCConfig().getSubnetIds().isEmpty() &&
+                        model.getVPCConfig().getSecurityGroupIds() != null &&
+                        !model.getVPCConfig().getSecurityGroupIds().isEmpty()) {
+                    logger.log("Updating vpcConfig");
+                    vpcConfigInput = VpcConfigInput.builder()
+                            .subnetIds(model.getVPCConfig().getSubnetIds())
+                            .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
+                            .build();
+                }
             }
 
             if (successRetentionPeriodInDays != model.getSuccessRetentionPeriod()) {
@@ -207,9 +211,8 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 logger.log("Updating executionRoleArn");
                 executionRoleArn = model.getExecutionRoleArn();
             }
-
         } catch (ResourceNotFoundException rfne) {
-            throw new CfnInvalidRequestException(rfne.getMessage());
+            throw new CfnNotFoundException(ResourceModel.TYPE_NAME, model.getPrimaryIdentifier().toString());
         }
 
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
@@ -261,7 +264,8 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                     proxy.injectCredentialsAndInvokeV2(untagResourceRequest, syntheticsClient::untagResource);
                 }
             }
-        } catch (final ValidationException e) {
+        }
+        catch (final ValidationException e) {
             throw new CfnInvalidRequestException(e.getMessage());
         } catch (final Exception e) {
             throw new CfnGeneralServiceException(e.getMessage());
@@ -376,7 +380,6 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 syntheticsClient);
         if (canaryStartingState) {
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .callbackContext(callbackContext)
                     .resourceModel(ModelHelper.constructModel(canary, model))
                     .status(OperationStatus.SUCCESS)
                     .build();
@@ -402,7 +405,6 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 syntheticsClient);
         if (canaryStoppingState) {
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .callbackContext(callbackContext)
                     .resourceModel(ModelHelper.constructModel(canary, model))
                     .status(OperationStatus.SUCCESS)
                     .build();
