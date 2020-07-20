@@ -1,0 +1,17 @@
+{
+  "Name": "Contract-test",
+  "ArtifactS3Location": "s3://cw-syn-results-440056434621-us-west-2",
+  "ExecutionRoleArn": "arn:aws:iam::440056434621:role/SyntheticsLambdaExecutionRole",
+  "RuntimeVersion": "syn-1.0",
+  "Code": {
+    "script": "var synthetics = require('Synthetics');\nconst log = require('SyntheticsLogger');\n\nconst pageLoadBlueprint = async function () {\n\n    // INSERT URL here\n    const URL = \"https://amazon.com\";\n\n    let page = await synthetics.getPage();\n    const response = await page.goto(URL, {waitUntil: 'domcontentloaded', timeout: 30000});\n    //Wait for page to render.\n    //Increase or decrease wait time based on endpoint being monitored.\n    await page.waitFor(15000);\n    await synthetics.takeScreenshot('loaded', 'loaded');\n    let pageTitle = await page.title();\n    log.info('Page title: ' + pageTitle);\n    if (response.status() !== 200) {\n        throw \"Failed to load page!\";\n    }\n};\n\nexports.handler = async () => {\n    return await pageLoadBlueprint();\n};",
+    "handler": "pageLoadBlueprint.handler"
+  },
+  "Schedule": {
+    "expression": "rate(1 minute)",
+    "durationInSeconds": 3600
+  },
+  "FailureRetentionPeriod": 30,
+  "SuccessRetentionPeriod": 30,
+  "StartCanaryAfterCreation": false
+}
