@@ -5,7 +5,6 @@ import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
 import software.amazon.cloudformation.exceptions.*;
 import software.amazon.cloudformation.proxy.*;
-import com.google.common.base.Strings;
 
 import java.util.Map;
 
@@ -19,7 +18,6 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
     private AmazonWebServicesClientProxy clientProxy;
     private ResourceHandlerRequest<ResourceModel> request;
     private SyntheticsClient syntheticsClient;
-    ResourceModel modelOutput;
 
     private String handlerName;
     private String scheduleExpression;
@@ -97,7 +95,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 // Canary has been started.Return SUCCESS
                 if (callbackContext.isCanaryStartStablized()) {
                     return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                            .resourceModel(ModelHelper.constructModel(getCanaryRecord(model, proxy, syntheticsClient), model))
+                            .resourceModel(model)
                             .status(OperationStatus.SUCCESS)
                             .build();
                 }
@@ -117,7 +115,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 // Canary has been started. Wait until it stabilizes
                 if (callbackContext.isCanaryStopStabilized()) {
                     return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                            .resourceModel(ModelHelper.constructModel(getCanaryRecord(model, proxy, syntheticsClient), model))
+                            .resourceModel(model)
                             .status(OperationStatus.SUCCESS)
                             .build();
                 }
@@ -311,7 +309,6 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             String canaryState = canary.status().stateAsString();
 
             if (canaryState.compareTo(CanaryStates.UPDATING.toString()) != 0) {
-                modelOutput = ModelHelper.constructModel(canary, model);
                 return true;
             } /*else if (canaryState.compareTo(CanaryStates.UPDATING.toString()) != 0 &&
                     (!isCanaryInReadyOrStoppedState(model, canaryState, false)
@@ -380,13 +377,13 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 syntheticsClient);
         if (canaryStartingState) {
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .resourceModel(ModelHelper.constructModel(canary, model))
+                    .resourceModel(model)
                     .status(OperationStatus.SUCCESS)
                     .build();
         }
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .callbackContext(callbackContext)
-                .resourceModel(ModelHelper.constructModel(canary, model))
+                .resourceModel(model)
                 .status(OperationStatus.IN_PROGRESS)
                 .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
                 .build();
@@ -405,13 +402,13 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 syntheticsClient);
         if (canaryStoppingState) {
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .resourceModel(ModelHelper.constructModel(canary, model))
+                    .resourceModel(model)
                     .status(OperationStatus.SUCCESS)
                     .build();
         }
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .callbackContext(callbackContext)
-                .resourceModel(ModelHelper.constructModel(canary, model))
+                .resourceModel(model)
                 .status(OperationStatus.IN_PROGRESS)
                 .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
                 .build();

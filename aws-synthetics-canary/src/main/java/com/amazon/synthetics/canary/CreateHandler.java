@@ -28,7 +28,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
     private static final String JS_SUFFIX = ".js";
     private static final int DEFAULT_CALLBACK_DELAY_SECONDS = 10;
     private static final int CALLBACK_DELAY_SECONDS_FOR_RUNNING_STATE = 30;
-    private static final int MAX_RETRY_TIMES = 10; // 5min * 60 / 30 = 10
+    private static final int MAX_RETRY_TIMES = 30;
     private static final int DEFAULT_MEMORY_IN_MB = 960;
 
     Logger logger;
@@ -168,7 +168,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         try {
             proxy.injectCredentialsAndInvokeV2(createCanaryRequest, syntheticsClient::createCanary);
         } catch (final ValidationException e) {
-            throw new CfnAlreadyExistsException(ResourceModel.TYPE_NAME, model.getPrimaryIdentifier().toString());
+            throw new CfnInvalidRequestException(e.getMessage());
         } catch (final Exception e) {
             throw new CfnGeneralServiceException(e.getMessage());
         }
@@ -273,7 +273,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         }
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .callbackContext(callbackContext)
-                .resourceModel(ModelHelper.constructModel(canary, model))
+                .resourceModel(model)
                 .status(OperationStatus.IN_PROGRESS)
                 .callbackDelaySeconds(CALLBACK_DELAY_SECONDS_FOR_RUNNING_STATE)
                 .build();
