@@ -10,6 +10,7 @@
             "amazon",
             "synthetics",
             "canary"
-        ]
+        ],
+        "protocolVersion": "2.0.0"
     }
 }
