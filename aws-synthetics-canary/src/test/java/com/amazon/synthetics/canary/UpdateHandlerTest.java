@@ -38,13 +38,13 @@ public class UpdateHandlerTest extends TestBase {
         logger = mock(Logger.class);
         handler  = new UpdateHandler();
         request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(buildModel())
+                .desiredResourceState(buildModel("syn-1.0"))
                 .clientRequestToken("clientRequestToken")
                 .logicalResourceIdentifier("logicIdentifier")
                 .build();
     }
 
-    private ResourceModel buildModel() {
+    private ResourceModel buildModel(String runtimeVersion) {
         final Code codeObjectForTesting = new Code(null,
                 null,
                 null,
@@ -101,7 +101,7 @@ public class UpdateHandlerTest extends TestBase {
                 .code(codeObjectForTesting)
                 .executionRoleArn("arn:aws:test::myaccount")
                 .schedule(scheduleForTesting)
-                .runtimeVersion("syn-1.0")
+                .runtimeVersion(runtimeVersion)
                 .startCanaryAfterCreation(true)
                 .vPCConfig(vpcConfig)
                 .tags(listTag)
@@ -116,7 +116,7 @@ public class UpdateHandlerTest extends TestBase {
     @Test
     public void handleRequest_SimpleSuccess() {
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(buildModel())
+                .desiredResourceState(buildModel("syn-1.0"))
                 .build();
 
         final Canary canary = Canary.builder()
@@ -147,6 +147,96 @@ public class UpdateHandlerTest extends TestBase {
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
 
         assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getCallbackContext()).isNull();
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
+    public void handleRequest_updateRuntime(){
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(buildModel("syn-nodejs-2.0-beta"))
+                .build();
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .schedule(canaryScheduleOutputForTesting())
+                .runtimeVersion("syn-1.0")
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder()
+                .canaryUpdationStarted(true)
+                .canaryUpdationStablized(true)
+                .canaryStartStarted(true)
+                .canaryStartStablized(true)
+                .canaryStopStarted(true)
+                .canaryStopStabilized(true)
+                .build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-nodejs-2.0-beta");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getCallbackContext()).isNull();
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
+    public void handleRequest_updateRuntimeDownVersion(){
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(buildModel("syn-1.0"))
+                .build();
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .schedule(canaryScheduleOutputForTesting())
+                .runtimeVersion("syn-nodejs-2.0-beta")
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder()
+                .canaryUpdationStarted(true)
+                .canaryUpdationStablized(true)
+                .canaryStartStarted(true)
+                .canaryStartStablized(true)
+                .canaryStopStarted(true)
+                .canaryStopStabilized(true)
+                .build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-1.0");
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
         assertThat(response.getCallbackContext()).isNull();
         assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
