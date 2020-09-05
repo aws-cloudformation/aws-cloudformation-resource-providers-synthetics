@@ -10,7 +10,9 @@ import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.proxy.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -162,19 +164,25 @@ public class UpdateHandlerTest extends TestBase {
                 .desiredResourceState(buildModel("syn-nodejs-2.0-beta"))
                 .build();
 
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
         final Canary canary = Canary.builder()
                 .name("canarytestname")
+                .executionRoleArn("test execution arn")
                 .code(codeOutputObjectForTesting())
                 .status(CanaryStatus.builder()
                         .state("RUNNING")
                         .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).build())
                 .schedule(canaryScheduleOutputForTesting())
                 .runtimeVersion("syn-1.0")
+                .tags(tagExisting)
                 .build();
 
         final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(true)
+                .canaryUpdationStarted(false)
+                .canaryUpdationStablized(false)
                 .canaryStartStarted(true)
                 .canaryStartStablized(true)
                 .canaryStopStarted(true)
@@ -192,9 +200,18 @@ public class UpdateHandlerTest extends TestBase {
 
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-nodejs-2.0-beta");
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
-        assertThat(response.getCallbackContext()).isNull();
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+
+        final CallbackContext callbackContextUpdated = CallbackContext.builder()
+                .canaryUpdationStarted(true)
+                .canaryUpdationStablized(false)
+                .canaryStartStarted(true)
+                .canaryStartStablized(true)
+                .canaryStopStarted(true)
+                .canaryStopStabilized(true)
+                .build();
+        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();
@@ -207,19 +224,25 @@ public class UpdateHandlerTest extends TestBase {
                 .desiredResourceState(buildModel("syn-1.0"))
                 .build();
 
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
         final Canary canary = Canary.builder()
                 .name("canarytestname")
+                .executionRoleArn("test execution arn")
                 .code(codeOutputObjectForTesting())
                 .status(CanaryStatus.builder()
                         .state("RUNNING")
                         .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).build())
                 .schedule(canaryScheduleOutputForTesting())
                 .runtimeVersion("syn-nodejs-2.0-beta")
+                .tags(tagExisting)
                 .build();
 
         final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(true)
+                .canaryUpdationStarted(false)
+                .canaryUpdationStablized(false)
                 .canaryStartStarted(true)
                 .canaryStartStablized(true)
                 .canaryStopStarted(true)
@@ -236,10 +259,79 @@ public class UpdateHandlerTest extends TestBase {
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
 
         assertThat(response).isNotNull();
-        assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-1.0");
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
-        assertThat(response.getCallbackContext()).isNull();
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
+        assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-nodejs-2.0-beta");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+
+        final CallbackContext callbackContextUpdated = CallbackContext.builder()
+                .canaryUpdationStarted(true)
+                .canaryUpdationStablized(false)
+                .canaryStartStarted(true)
+                .canaryStartStablized(true)
+                .canaryStopStarted(true)
+                .canaryStopStabilized(true)
+                .build();
+        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
+    public void handleRequest_updateDuration(){
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(buildModel("syn-nodejs-2.0-beta"))
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).build())
+                .schedule(canaryScheduleOutputWithNullDurationForTesting())
+                .runtimeVersion("syn-nodejs-2.0-beta")
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder()
+                .canaryUpdationStarted(false)
+                .canaryUpdationStablized(false)
+                .canaryStartStarted(true)
+                .canaryStartStablized(true)
+                .canaryStopStarted(true)
+                .canaryStopStabilized(true)
+                .build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+
+        final CallbackContext callbackContextUpdated = CallbackContext.builder()
+                .canaryUpdationStarted(true)
+                .canaryUpdationStablized(false)
+                .canaryStartStarted(true)
+                .canaryStartStablized(true)
+                .canaryStopStarted(true)
+                .canaryStopStabilized(true)
+                .build();
+        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();

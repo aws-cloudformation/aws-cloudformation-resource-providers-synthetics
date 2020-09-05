@@ -145,9 +145,9 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
 
             handlerName = canary.code().handler();
             scheduleExpression = canary.schedule().expression();
-            durationInSecs = canary.schedule().durationInSeconds().toString();
-            timeoutInSeconds = canary.runConfig().timeoutInSeconds();
-            memoryInMB = canary.runConfig().memoryInMB();
+            durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : "";
+            timeoutInSeconds = canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null;
+            memoryInMB = canary.runConfig() != null ? canary.runConfig().memoryInMB() : null;
             successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
             failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
             executionRoleArn = canary.executionRoleArn();
