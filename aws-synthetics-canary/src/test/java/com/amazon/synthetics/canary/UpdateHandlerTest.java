@@ -259,7 +259,7 @@ public class UpdateHandlerTest extends TestBase {
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
 
         assertThat(response).isNotNull();
-        assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-nodejs-2.0-beta");
+        assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-1.0");
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         final CallbackContext callbackContextUpdated = CallbackContext.builder()
