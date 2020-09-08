@@ -51,17 +51,15 @@ public class ModelHelper {
     }
 
     private static Code buildCodeObject(CanaryCodeOutput canaryCodeOutput) {
-        Code code = Code.builder()
+        return Code.builder()
                 .handler(canaryCodeOutput.handler())
                 .build();
-        return code;
     }
 
     private static Schedule buildCanaryScheduleObject(CanaryScheduleOutput canaryScheduleOutput) {
-        Schedule schedule = Schedule.builder()
+        return Schedule.builder()
                 .durationInSeconds(canaryScheduleOutput.durationInSeconds().toString())
                 .expression(canaryScheduleOutput.expression()).build();
-        return schedule;
     }
 
     private static List<Tag> buildTagObject(final Map<String, String> tags) {
@@ -173,9 +171,7 @@ public class ModelHelper {
             modelTagsCopyES = new HashSet<Map.Entry<String, String>>(modelTagMap.entrySet());
         }
 
-        if (copyExistingTags != null) {
-            canaryTags = copyExistingTags.entrySet();
-        }
+        canaryTags = copyExistingTags.entrySet();
 
         if (modelTagList == null) {
             return null;
