@@ -244,7 +244,6 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         boolean canaryStartingState = checkCanaryStartStabilization(model, proxy, callbackContext, syntheticsClient);
         callbackContext.setCanaryStartStablized(canaryStartingState);
         callbackContext.incrementRetryTimes();
-        OperationStatus operationStatus;
 
         Canary canary = getCanaryRecord(model,
                 proxy,
