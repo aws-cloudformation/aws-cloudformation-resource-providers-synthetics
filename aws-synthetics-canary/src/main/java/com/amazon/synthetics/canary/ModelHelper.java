@@ -146,10 +146,10 @@ public class ModelHelper {
     private static String getPartition(String region) {
         String partition = "aws";
         if (region.contains("us-gov-")) {
-            partition.concat("-us-gov");
+            partition += "-us-gov";
         }
         if (region.contains("cn-")) {
-            partition.concat("-cn");
+            partition += "-cn";
         }
         return partition;
     }
