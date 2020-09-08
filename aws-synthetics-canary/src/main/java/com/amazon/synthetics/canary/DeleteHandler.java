@@ -119,7 +119,7 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
             Canary canary = getCanaryResponse.canary();
             // Canary is in the RUNNING state. Need to STOP first
-            if (canary.status().stateAsString().compareTo(CanaryStates.RUNNING.toString()) == 0) {
+            if (canary.status().state() == CanaryState.RUNNING) {
                 StopCanaryRequest stopCanaryRequest = StopCanaryRequest.builder().name(canary.name()).build();
                 proxy.injectCredentialsAndInvokeV2(stopCanaryRequest, syntheticsClient::stopCanary);
             }
@@ -218,10 +218,8 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
 
         try {
             GetCanaryResponse getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
-            String canaryState = getCanaryResponse.canary().status().stateAsString();
-            if (canaryState.compareTo(CanaryStates.READY.toString()) == 0
-                    || canaryState.compareTo(CanaryStates.STOPPED.toString()) == 0
-            ) {
+            CanaryState canaryState = getCanaryResponse.canary().status().state();
+            if (canaryState == CanaryState.READY || canaryState == CanaryState.STOPPED) {
                 return true;
             }
         } catch (CfnInvalidRequestException cfnInvalidRequestException) {

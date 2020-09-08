@@ -2,6 +2,7 @@ package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
+import software.amazon.awssdk.services.synthetics.model.CanaryState;
 import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeInput;
@@ -205,7 +206,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             Canary canary = getCanaryRecord(model,
                     proxy,
                     syntheticsClient);
-            if (canary.status().stateAsString().compareTo(CanaryStates.READY.toString()) == 0) {
+            if (canary.status().state() == CanaryState.READY) {
                 return true;
             }
         } catch (final ResourceNotFoundException e) {
@@ -275,11 +276,9 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest,
                     syntheticsClient::getCanary);
 
-            String canaryState = getCanaryResponse.canary().status().stateAsString();
-            if (canaryState.compareTo(CanaryStates.RUNNING.toString()) == 0
-                    || canaryState.compareTo(CanaryStates.STOPPED.toString()) == 0) {
-                logger.log(String.format("Canary has successfully entered the %s state" ,
-                        CanaryStates.RUNNING.toString()));
+            CanaryState canaryState = getCanaryResponse.canary().status().state();
+            if (canaryState == CanaryState.RUNNING || canaryState == CanaryState.STOPPED) {
+                logger.log(String.format("Canary has successfully entered the %s state" , canaryState));
                 return true;
             }
         } catch (final ResourceNotFoundException e) {
