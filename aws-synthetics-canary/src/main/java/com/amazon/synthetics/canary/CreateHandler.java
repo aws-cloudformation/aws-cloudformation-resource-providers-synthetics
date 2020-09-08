@@ -67,7 +67,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         }
 
         // Canary has been successfully created. Check if it needs to be started or return SUCCESS
-        if (model.getStartCanaryAfterCreation().equals(Boolean.TRUE)) {
+        if (model.getStartCanaryAfterCreation()) {
             if (!callbackContext.isCanaryStartStarted()) {
                 return startCanary(model, callbackContext, proxy, request, syntheticsClient);
             }
