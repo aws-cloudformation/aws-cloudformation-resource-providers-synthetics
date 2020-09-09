@@ -72,48 +72,32 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         Canary canary = getCanaryRecord(model, proxy, syntheticsClient);
         CanaryState canaryState = canary.status().state();
 
-        if (canaryState != CanaryState.UPDATING &&
-                (isCanaryInReadyOrStoppedState(model, canaryState)
-                        || isCanaryInRunningState(model, canaryState))) {
+        if (model.getStartCanaryAfterCreation()) {
+            if (canaryState != CanaryState.RUNNING) {
+                if (!callbackContext.isCanaryStartStarted()) {
+                    return startCanary(model, callbackContext, proxy, request, syntheticsClient);
+                }
+
+                // Canary has been started. Wait until it stabilizes
+                if (!callbackContext.isCanaryStartStablized()) {
+                    return updateCanaryStartProgress(model, callbackContext, proxy, request, syntheticsClient);
+                }
+            }
+
+            // Canary has been started. Return SUCCESS.
             return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                .resourceModel(model)
+                .status(OperationStatus.SUCCESS)
+                .build();
+        } else {
+            if (canaryState == CanaryState.READY || canaryState == CanaryState.STOPPED) {
+                return ProgressEvent.<ResourceModel, CallbackContext>builder()
                     .resourceModel(model)
                     .status(OperationStatus.SUCCESS)
                     .build();
+            }
         }
 
-        if (model.getStartCanaryAfterCreation() && canaryState != CanaryState.RUNNING) {
-            if (!callbackContext.isCanaryStartStarted()) {
-                return startCanary(model, callbackContext, proxy, request, syntheticsClient);
-            }
-
-            // Canary has been started. Wait until it stabilizes
-            if (!callbackContext.isCanaryStartStablized()) {
-                return updateCanaryStartProgress(model, callbackContext, proxy, request, syntheticsClient);
-            }
-
-            // Canary has been started.Return SUCCESS
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .resourceModel(model)
-                    .status(OperationStatus.SUCCESS)
-                    .build();
-        }
-
-        if (model.getStartCanaryAfterCreation() && canaryState == CanaryState.RUNNING) {
-            if (!callbackContext.isCanaryStopStarted()) {
-                return stopCanary(model, callbackContext, proxy, request, syntheticsClient);
-            }
-
-            // Canary stopping has been started. Wait until it stabilizes
-            if (!callbackContext.isCanaryStopStabilized()) {
-                return updateCanaryStopProgress(model, callbackContext, proxy, request, syntheticsClient);
-            }
-
-            // Canary has been started. Wait until it stabilizes
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .resourceModel(model)
-                    .status(OperationStatus.SUCCESS)
-                    .build();
-        }
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .resourceModel(model)
                 .status(OperationStatus.FAILED)
@@ -430,23 +414,6 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             return false;
         }
         return false;
-    }
-
-    private boolean isCanaryInReadyOrStoppedState(ResourceModel model, CanaryState canaryState) {
-        /*
-          If stack is updated setting getStartCanaryAfterCreation to false
-          AND canary returns to READY or STOPPED state, return true.
-         */
-        return !model.getStartCanaryAfterCreation()
-                && (canaryState == CanaryState.READY || canaryState == CanaryState.STOPPED);
-    }
-
-    private boolean isCanaryInRunningState(ResourceModel model, CanaryState canaryState) {
-        /*
-          If stack is updated setting getStartCanaryAfterCreation to true
-          AND canary is set to RUNNING state, return true.
-         */
-        return model.getStartCanaryAfterCreation() && (canaryState == CanaryState.RUNNING);
     }
 
 
