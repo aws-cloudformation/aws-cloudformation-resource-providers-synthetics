@@ -75,17 +75,10 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                                                                        final AmazonWebServicesClientProxy proxy,
                                                                        final ResourceHandlerRequest<ResourceModel> request,
                                                                        final SyntheticsClient syntheticsClient) {
-        final GetCanaryResponse getCanaryResponse;
-        // Validate if canary that is to be deleted is in the correct state, else throw error
-        final GetCanaryRequest getCanaryRequest = GetCanaryRequest.builder().name(model.getName()).build();
-
         final DeleteCanaryRequest deleteCanaryRequest = DeleteCanaryRequest.builder()
                 .name(model.getName())
                 .build();
         try {
-            getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
-            Canary canary = getCanaryResponse.canary();
-            // At this point, Canary is already in the STOPPED or READY state for deletion
             proxy.injectCredentialsAndInvokeV2(deleteCanaryRequest, syntheticsClient::deleteCanary);
             callbackContext.setCanaryDeleteStarted(true);
         } catch (final ResourceNotFoundException resourceNotFoundException) {
@@ -110,7 +103,6 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                                                                                       final AmazonWebServicesClientProxy proxy,
                                                                                       final ResourceHandlerRequest<ResourceModel> request,
                                                                                       final SyntheticsClient syntheticsClient) {
-
         callbackContext.setCanaryStopStarted(true);
         final GetCanaryResponse getCanaryResponse;
         // Validate if canary that is to be deleted is in the correct state, else throw error
