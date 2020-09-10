@@ -101,6 +101,12 @@ public class TestBase {
                 .durationInSeconds(Long.valueOf("3600")).build();
         return canaryScheduleOutput;
     }
+    public static CanaryScheduleOutput canaryScheduleOutputWithNullDurationForTesting() {
+        CanaryScheduleOutput canaryScheduleOutput = CanaryScheduleOutput.builder()
+                .expression("rate(1 min)")
+                .durationInSeconds(null).build();
+        return canaryScheduleOutput;
+    }
 
     public static CanaryStatus canaryStatusForTesting() {
         CanaryStatus canaryStatus = CanaryStatus.builder()
