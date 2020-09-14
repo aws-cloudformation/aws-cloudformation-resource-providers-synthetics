@@ -18,6 +18,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: com.amazon.synthetics.canary.HandlerWrapper::testEntrypoint
+      MemorySize: 256
       Runtime: java8
       CodeUri: ./target/aws-synthetics-canary-1.0-SNAPSHOT.jar
 

@@ -96,7 +96,7 @@ public class CreateHandlerTest extends TestBase{
                 .runtimeVersion("syn-1.0")
                 .startCanaryAfterCreation(true)
                 .tags(listTag)
-                .runConfig(RunConfig.builder().timeoutInSeconds(60).memoryInMB(1024).build())
+                .runConfig(RunConfig.builder().timeoutInSeconds(60).memoryInMB(1024).activeTracing(true).build())
                 .successRetentionPeriod(31)
                 .failureRetentionPeriod(31)
                 .build();
@@ -171,7 +171,7 @@ public class CreateHandlerTest extends TestBase{
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
                 .canary(canary)
                 .build();
-       // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
+        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
         final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
         final CallbackContext inputContext = CallbackContext.builder().build();
         final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
@@ -190,5 +190,172 @@ public class CreateHandlerTest extends TestBase{
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();
         assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
+    public void handleRequest_createCanary_withoutActiveTracing() {
+        RunConfig runConfig = new RunConfig();
+        runConfig.setTimeoutInSeconds(60);
+        runConfig.setMemoryInMB(1024);
+        model.setRunConfig(runConfig);
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
+                .timeoutInSeconds(60)
+                .memoryInMB(1024)
+                .activeTracing(false)
+                .build();
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .schedule(canaryScheduleOutputForTesting())
+                .runConfig(outputExpected)
+                .build();
+
+        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
+                .canary(canary)
+                .build();
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
+        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
+        final CallbackContext inputContext = CallbackContext.builder().build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
+
+        doReturn(createCanaryResponse,
+                getCanaryResponse,
+                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
+        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isNull();
+    }
+
+    @Test
+    public void handleRequest_createCanary_withActiveTracingTrue() {
+        RunConfig runConfig = new RunConfig();
+        runConfig.setTimeoutInSeconds(60);
+        runConfig.setMemoryInMB(1024);
+        runConfig.setActiveTracing(true);
+        model.setRunConfig(runConfig);
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
+                .timeoutInSeconds(60)
+                .memoryInMB(1024)
+                .activeTracing(true)
+                .build();
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .schedule(canaryScheduleOutputForTesting())
+                .runConfig(outputExpected)
+                .build();
+
+        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
+                .canary(canary)
+                .build();
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
+        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
+        final CallbackContext inputContext = CallbackContext.builder().build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
+
+        doReturn(createCanaryResponse,
+                getCanaryResponse,
+                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
+        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(true);
+    }
+
+    @Test
+    public void handleRequest_createCanary_withActiveTracingFalse() {
+        RunConfig runConfig = new RunConfig();
+        runConfig.setTimeoutInSeconds(60);
+        runConfig.setMemoryInMB(1024);
+        runConfig.setActiveTracing(false);
+        model.setRunConfig(runConfig);
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
+                .timeoutInSeconds(60)
+                .memoryInMB(1024)
+                .activeTracing(false)
+                .build();
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .schedule(canaryScheduleOutputForTesting())
+                .runConfig(outputExpected)
+                .build();
+
+        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
+                .canary(canary)
+                .build();
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
+        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
+        final CallbackContext inputContext = CallbackContext.builder().build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
+
+        doReturn(createCanaryResponse,
+                getCanaryResponse,
+                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
+        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
     }
 }
