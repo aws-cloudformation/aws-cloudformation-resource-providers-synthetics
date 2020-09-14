@@ -24,6 +24,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
     private String durationInSecs;
     private Integer timeoutInSeconds;
     private Integer memoryInMB;
+    private Boolean activeTracing;
     private VpcConfigInput vpcConfigInput;
     private String executionRoleArn;
     private Integer successRetentionPeriodInDays;
@@ -148,6 +149,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : "";
             timeoutInSeconds = canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null;
             memoryInMB = canary.runConfig() != null ? canary.runConfig().memoryInMB() : null;
+            activeTracing = canary.runConfig() != null && canary.runConfig().activeTracing() != null ? canary.runConfig().activeTracing() : false;
             successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
             failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
             executionRoleArn = canary.executionRoleArn();
@@ -179,6 +181,11 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 if (model.getRunConfig().getMemoryInMB() != null && memoryInMB != model.getRunConfig().getMemoryInMB()) {
                     logger.log("Updating memory");
                     memoryInMB = model.getRunConfig().getMemoryInMB();
+                }
+
+                if(!activeTracing.equals(model.getRunConfig().getActiveTracing())) {
+                    logger.log("Updating active tracing");
+                    activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
                 }
             }
 
@@ -228,6 +235,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         final CanaryRunConfigInput canaryRunConfigInput = CanaryRunConfigInput.builder()
                 .timeoutInSeconds(timeoutInSeconds)
                 .memoryInMB(memoryInMB)
+                .activeTracing(activeTracing)
                 .build();
 
         final UpdateCanaryRequest updateCanaryRequest = UpdateCanaryRequest.builder()
@@ -236,6 +244,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 .executionRoleArn(executionRoleArn)
                 .runtimeVersion(model.getRuntimeVersion())
                 .schedule(canaryScheduleInput)
+                .runtimeVersion(model.getRuntimeVersion())
                 .runConfig(canaryRunConfigInput)
                 .successRetentionPeriodInDays(successRetentionPeriodInDays)
                 .failureRetentionPeriodInDays(failureRetentionPeriodInDays)
