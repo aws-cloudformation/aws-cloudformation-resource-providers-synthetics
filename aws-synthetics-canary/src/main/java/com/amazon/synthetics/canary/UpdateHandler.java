@@ -244,6 +244,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 .executionRoleArn(executionRoleArn)
                 .runtimeVersion(model.getRuntimeVersion())
                 .schedule(canaryScheduleInput)
+                .runtimeVersion(model.getRuntimeVersion())
                 .runConfig(canaryRunConfigInput)
                 .successRetentionPeriodInDays(successRetentionPeriodInDays)
                 .failureRetentionPeriodInDays(failureRetentionPeriodInDays)
