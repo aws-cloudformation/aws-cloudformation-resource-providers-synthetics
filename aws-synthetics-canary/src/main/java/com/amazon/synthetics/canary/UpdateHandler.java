@@ -131,17 +131,17 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             tags = canary.tags();
             canaryState = canary.status().stateAsString();
 
-            if (canary.code().handler().compareTo(model.getCode().getHandler()) != 0) {
+            if (!Objects.equals(handlerName, model.getCode().getHandler())) {
                 logger.log("Updating handler");
                 handlerName = model.getCode().getHandler();
             }
 
-            if (scheduleExpression.compareTo(model.getSchedule().getExpression()) != 0) {
+            if (!Objects.equals(scheduleExpression, model.getSchedule().getExpression())) {
                 logger.log("Updating scheduleExpression");
                 scheduleExpression = model.getSchedule().getExpression();
             }
 
-            if (durationInSecs.compareTo(model.getSchedule().getDurationInSeconds()) != 0) {
+            if (!Objects.equals(durationInSecs, model.getSchedule().getDurationInSeconds())) {
                 logger.log("Updating durationInSecs");
                 durationInSecs = model.getSchedule().getDurationInSeconds();
             }
@@ -182,7 +182,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 failureRetentionPeriodInDays = model.getFailureRetentionPeriod();
             }
 
-            if (executionRoleArn.compareTo(model.getExecutionRoleArn()) != 0) {
+            if (!Objects.equals(executionRoleArn, model.getExecutionRoleArn())) {
                 logger.log("Updating executionRoleArn");
                 executionRoleArn = model.getExecutionRoleArn();
             }
