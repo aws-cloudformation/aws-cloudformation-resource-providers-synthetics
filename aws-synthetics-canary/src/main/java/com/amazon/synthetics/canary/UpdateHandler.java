@@ -20,18 +20,6 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
     private ResourceHandlerRequest<ResourceModel> request;
     private SyntheticsClient syntheticsClient;
 
-    private String handlerName;
-    private String scheduleExpression;
-    private String durationInSecs;
-    private Integer timeoutInSeconds;
-    private Integer memoryInMB;
-    private VpcConfigInput vpcConfigInput;
-    private String executionRoleArn;
-    private Integer successRetentionPeriodInDays;
-    private Integer failureRetentionPeriodInDays;
-    private Map<String, String> tags;
-    private String canaryState;
-
     @Override
     public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
             final AmazonWebServicesClientProxy proxy,
@@ -114,80 +102,80 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 .name(model.getName())
                 .build();
         final GetCanaryResponse getCanaryResponse;
+
         try {
             getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest,
                     syntheticsClient::getCanary);
-            Canary canary = getCanaryResponse.canary();
-
-            handlerName = canary.code().handler();
-            scheduleExpression = canary.schedule().expression();
-            durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : "";
-            timeoutInSeconds = canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null;
-            memoryInMB = canary.runConfig() != null ? canary.runConfig().memoryInMB() : null;
-            successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
-            failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
-            executionRoleArn = canary.executionRoleArn();
-            VpcConfigOutput vpcConfig = canary.vpcConfig();
-            tags = canary.tags();
-            canaryState = canary.status().stateAsString();
-
-            if (!Objects.equals(handlerName, model.getCode().getHandler())) {
-                logger.log("Updating handler");
-                handlerName = model.getCode().getHandler();
-            }
-
-            if (!Objects.equals(scheduleExpression, model.getSchedule().getExpression())) {
-                logger.log("Updating scheduleExpression");
-                scheduleExpression = model.getSchedule().getExpression();
-            }
-
-            if (!Objects.equals(durationInSecs, model.getSchedule().getDurationInSeconds())) {
-                logger.log("Updating durationInSecs");
-                durationInSecs = model.getSchedule().getDurationInSeconds();
-            }
-
-            if (model.getRunConfig() != null) {
-                if (!Objects.equals(timeoutInSeconds, model.getRunConfig().getTimeoutInSeconds())) {
-                    logger.log("Updating timeoutInSeconds");
-                    timeoutInSeconds = model.getRunConfig().getTimeoutInSeconds();
-                }
-
-                if (model.getRunConfig().getMemoryInMB() != null &&
-                    !Objects.equals(memoryInMB, model.getRunConfig().getMemoryInMB())) {
-                    logger.log("Updating memory");
-                    memoryInMB = model.getRunConfig().getMemoryInMB();
-                }
-            }
-
-            if (model.getVPCConfig() != null) {
-                if (model.getVPCConfig().getSubnetIds() != null &&
-                        !model.getVPCConfig().getSubnetIds().isEmpty() &&
-                        model.getVPCConfig().getSecurityGroupIds() != null &&
-                        !model.getVPCConfig().getSecurityGroupIds().isEmpty()) {
-                    logger.log("Updating vpcConfig");
-                    vpcConfigInput = VpcConfigInput.builder()
-                            .subnetIds(model.getVPCConfig().getSubnetIds())
-                            .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
-                            .build();
-                }
-            }
-
-            if (!Objects.equals(successRetentionPeriodInDays, model.getSuccessRetentionPeriod())) {
-                logger.log("Updating successRetentionPeriodInDays");
-                successRetentionPeriodInDays = model.getSuccessRetentionPeriod();
-            }
-
-            if (!Objects.equals(failureRetentionPeriodInDays, model.getFailureRetentionPeriod())) {
-                logger.log("Updating failureRetentionPeriodInDays");
-                failureRetentionPeriodInDays = model.getFailureRetentionPeriod();
-            }
-
-            if (!Objects.equals(executionRoleArn, model.getExecutionRoleArn())) {
-                logger.log("Updating executionRoleArn");
-                executionRoleArn = model.getExecutionRoleArn();
-            }
         } catch (ResourceNotFoundException rfne) {
             throw new CfnNotFoundException(ResourceModel.TYPE_NAME, model.getPrimaryIdentifier().toString());
+        }
+
+        Canary canary = getCanaryResponse.canary();
+
+        String handlerName = canary.code().handler();
+        String scheduleExpression = canary.schedule().expression();
+        String durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : "";
+        Integer timeoutInSeconds = canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null;
+        Integer memoryInMB = canary.runConfig() != null ? canary.runConfig().memoryInMB() : null;
+        Integer successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
+        Integer failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
+        String executionRoleArn = canary.executionRoleArn();
+        VpcConfigInput vpcConfigInput = null;
+
+        if (!Objects.equals(handlerName, model.getCode().getHandler())) {
+            logger.log("Updating handler");
+            handlerName = model.getCode().getHandler();
+        }
+
+        if (!Objects.equals(scheduleExpression, model.getSchedule().getExpression())) {
+            logger.log("Updating scheduleExpression");
+            scheduleExpression = model.getSchedule().getExpression();
+        }
+
+        if (!Objects.equals(durationInSecs, model.getSchedule().getDurationInSeconds())) {
+            logger.log("Updating durationInSecs");
+            durationInSecs = model.getSchedule().getDurationInSeconds();
+        }
+
+        if (model.getRunConfig() != null) {
+            if (!Objects.equals(timeoutInSeconds, model.getRunConfig().getTimeoutInSeconds())) {
+                logger.log("Updating timeoutInSeconds");
+                timeoutInSeconds = model.getRunConfig().getTimeoutInSeconds();
+            }
+
+            if (model.getRunConfig().getMemoryInMB() != null &&
+                !Objects.equals(memoryInMB, model.getRunConfig().getMemoryInMB())) {
+                logger.log("Updating memory");
+                memoryInMB = model.getRunConfig().getMemoryInMB();
+            }
+        }
+
+        if (model.getVPCConfig() != null) {
+            if (model.getVPCConfig().getSubnetIds() != null &&
+                !model.getVPCConfig().getSubnetIds().isEmpty() &&
+                model.getVPCConfig().getSecurityGroupIds() != null &&
+                !model.getVPCConfig().getSecurityGroupIds().isEmpty()) {
+                logger.log("Updating vpcConfig");
+                vpcConfigInput = VpcConfigInput.builder()
+                    .subnetIds(model.getVPCConfig().getSubnetIds())
+                    .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
+                    .build();
+            }
+        }
+
+        if (!Objects.equals(successRetentionPeriodInDays, model.getSuccessRetentionPeriod())) {
+            logger.log("Updating successRetentionPeriodInDays");
+            successRetentionPeriodInDays = model.getSuccessRetentionPeriod();
+        }
+
+        if (!Objects.equals(failureRetentionPeriodInDays, model.getFailureRetentionPeriod())) {
+            logger.log("Updating failureRetentionPeriodInDays");
+            failureRetentionPeriodInDays = model.getFailureRetentionPeriod();
+        }
+
+        if (!Objects.equals(executionRoleArn, model.getExecutionRoleArn())) {
+            logger.log("Updating executionRoleArn");
+            executionRoleArn = model.getExecutionRoleArn();
         }
 
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
@@ -223,7 +211,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             proxy.injectCredentialsAndInvokeV2(updateCanaryRequest, syntheticsClient::updateCanary);
             // if tags need to be updated then we need to call TagResourceRequest
             if (model.getTags() != null) {
-                Map<String, Map<String, String>> tagResourceMap = ModelHelper.updateTags(model, tags);
+                Map<String, Map<String, String>> tagResourceMap = ModelHelper.updateTags(model, canary.tags());
                 if (!tagResourceMap.get(ADD_TAGS).isEmpty()) {
                     TagResourceRequest tagResourceRequest = TagResourceRequest.builder()
                             .resourceArn(ModelHelper.buildCanaryArn(request, model.getName()))
