@@ -2,6 +2,7 @@ package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
+import software.amazon.awssdk.services.synthetics.model.CanaryState;
 import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeInput;
@@ -18,20 +19,13 @@ import software.amazon.awssdk.services.synthetics.model.GetCanaryResponse;
 import software.amazon.cloudformation.exceptions.*;
 import software.amazon.cloudformation.proxy.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 public class CreateHandler extends BaseHandler<CallbackContext> {
-    private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
-    private static final String JS_SUFFIX = ".js";
     private static final int DEFAULT_CALLBACK_DELAY_SECONDS = 10;
     private static final int CALLBACK_DELAY_SECONDS_FOR_RUNNING_STATE = 30;
     private static final int MAX_RETRY_TIMES = 30;
     private static final int DEFAULT_MEMORY_IN_MB = 960;
 
-    Logger logger;
+    private Logger logger;
     private AmazonWebServicesClientProxy clientProxy;
     private ResourceHandlerRequest<ResourceModel> request;
     private SyntheticsClient syntheticsClient;
@@ -69,41 +63,33 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         }
 
         //Canary creation started. Check for stabilization.
-        if (callbackContext.isCanaryCreationStarted() && !callbackContext.isCanaryCreationStablized()) {
+        if (!callbackContext.isCanaryCreationStablized()) {
             return updateCanaryCreationProgress(model, callbackContext, proxy, request, syntheticsClient);
         }
 
         // Canary has been successfully created. Check if it needs to be started or return SUCCESS
-        if (callbackContext.isCanaryCreationStablized()) {
-            if (model.getStartCanaryAfterCreation().equals(Boolean.TRUE)) {
-                if (!callbackContext.isCanaryStartStarted()) {
-                    return startCanary(model, callbackContext, proxy, request, syntheticsClient);
-                }
-
-                // Canary has been started. Wait until it stabilizes
-                if (callbackContext.isCanaryStartStarted() && !callbackContext.isCanaryStartStablized()) {
-                    return updateCanaryStartProgress(model, callbackContext, proxy, request, syntheticsClient);
-                }
-
-                // Canary has been started. Wait until it stabilizes
-                if (callbackContext.isCanaryStartStablized()) {
-                    return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                            .resourceModel(ModelHelper.constructModel(getCanaryRecord(model,proxy,syntheticsClient), model))
-                            .status(OperationStatus.SUCCESS)
-                            .build();
-                }
-            } else {
-                // Just return the canary meta data
-                return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                        .resourceModel(ModelHelper.constructModel(getCanaryRecord(model,proxy,syntheticsClient), model))
-                        .status(OperationStatus.SUCCESS)
-                        .build();
+        if (model.getStartCanaryAfterCreation()) {
+            if (!callbackContext.isCanaryStartStarted()) {
+                return startCanary(model, callbackContext, proxy, request, syntheticsClient);
             }
+
+            // Canary has been started. Wait until it stabilizes
+            if (!callbackContext.isCanaryStartStablized()) {
+                return updateCanaryStartProgress(model, callbackContext, proxy, request, syntheticsClient);
+            }
+
+            // Canary has been started. Wait until it stabilizes
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .resourceModel(ModelHelper.constructModel(getCanaryRecord(model,proxy,syntheticsClient), model))
+                    .status(OperationStatus.SUCCESS)
+                    .build();
+        } else {
+            // Just return the canary meta data
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .resourceModel(ModelHelper.constructModel(getCanaryRecord(model,proxy,syntheticsClient), model))
+                    .status(OperationStatus.SUCCESS)
+                    .build();
         }
-        return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .resourceModel(model)
-                .status(OperationStatus.FAILED)
-                .build();
     }
 
 
@@ -115,9 +101,9 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
 
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
                 .handler(model.getCode().getHandler())
-                .s3Bucket(model.getCode().getS3Bucket() != null ? model.getCode().getS3Bucket() : null)
-                .s3Key(model.getCode().getS3Key() != null ? model.getCode().getS3Key() : null )
-                .s3Version(model.getCode().getS3ObjectVersion() != null ? model.getCode().getS3ObjectVersion() : null )
+                .s3Bucket(model.getCode().getS3Bucket())
+                .s3Key(model.getCode().getS3Key())
+                .s3Version(model.getCode().getS3ObjectVersion())
                 .zipFile(model.getCode().getScript() != null ? ModelHelper.compressRawScript(model.getCode()) : null)
                 .build();
 
@@ -131,7 +117,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
 
         int memoryInMb = DEFAULT_MEMORY_IN_MB;
         CanaryRunConfigInput canaryRunConfigInput = null;
-        if ( model.getRunConfig() != null ) {
+        if (model.getRunConfig() != null) {
             // memoryInMb is optional input. Default value if no value is supplied
             memoryInMb = model.getRunConfig().getMemoryInMB() != null ?
                     model.getRunConfig().getMemoryInMB() : DEFAULT_MEMORY_IN_MB;
@@ -186,12 +172,10 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                                                                                        final CallbackContext callbackContext,
                                                                                        final AmazonWebServicesClientProxy proxy,
                                                                                        final ResourceHandlerRequest<ResourceModel> request,
-                                                                                       final SyntheticsClient syntheticsClient
-    ) {
+                                                                                       final SyntheticsClient syntheticsClient) {
         boolean canaryCreationState = checkCreateStabilization(model, proxy, callbackContext, syntheticsClient);
         callbackContext.setCanaryCreationStablized(canaryCreationState);
         callbackContext.incrementRetryTimes();
-        OperationStatus operationStatus;
         Canary canary;
 
         if (canaryCreationState && !model.getStartCanaryAfterCreation()) {
@@ -222,7 +206,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             Canary canary = getCanaryRecord(model,
                     proxy,
                     syntheticsClient);
-            if (canary.status().stateAsString().compareTo(CanaryStates.READY.toString()) == 0) {
+            if (canary.status().state() == CanaryState.READY) {
                 return true;
             }
         } catch (final ResourceNotFoundException e) {
@@ -260,7 +244,6 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         boolean canaryStartingState = checkCanaryStartStabilization(model, proxy, callbackContext, syntheticsClient);
         callbackContext.setCanaryStartStablized(canaryStartingState);
         callbackContext.incrementRetryTimes();
-        OperationStatus operationStatus;
 
         Canary canary = getCanaryRecord(model,
                 proxy,
@@ -293,11 +276,9 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest,
                     syntheticsClient::getCanary);
 
-            String canaryState = getCanaryResponse.canary().status().stateAsString();
-            if (canaryState.compareTo(CanaryStates.RUNNING.toString()) == 0
-                    || canaryState.compareTo(CanaryStates.STOPPED.toString()) == 0) {
-                logger.log(String.format("Canary has successfully entered the %s state" ,
-                        CanaryStates.RUNNING.toString()));
+            CanaryState canaryState = getCanaryResponse.canary().status().state();
+            if (canaryState == CanaryState.RUNNING || canaryState == CanaryState.STOPPED) {
+                logger.log(String.format("Canary has successfully entered the %s state" , canaryState));
                 return true;
             }
         } catch (final ResourceNotFoundException e) {

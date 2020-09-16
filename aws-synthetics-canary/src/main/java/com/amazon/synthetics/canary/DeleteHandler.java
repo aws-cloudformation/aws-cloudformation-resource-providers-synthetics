@@ -13,7 +13,8 @@ import software.amazon.cloudformation.proxy.*;
 public class DeleteHandler extends BaseHandler<CallbackContext> {
     private static final int CALLBACK_DELAY_SECONDS = 10;
     private static final int MAX_RETRY_TIMES = 10;
-    Logger logger;
+
+    private Logger logger;
     private AmazonWebServicesClientProxy clientProxy;
     private ResourceHandlerRequest<ResourceModel> request;
     private SyntheticsClient syntheticsClient;
@@ -50,16 +51,16 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             return checkCanaryStateForDeletion(model, callbackContext, proxy, request, syntheticsClient);
         }
 
-        if (callbackContext.isCanaryStopStarted() && !callbackContext.isCanaryStopStabilized()) {
+        if (!callbackContext.isCanaryStopStabilized()) {
             return updateCanaryStopProgress(model, callbackContext, proxy, request, syntheticsClient);
         }
         // Start delete canary action
-        if (callbackContext.isCanaryStopStabilized() && !callbackContext.isCanaryDeleteStarted()) {
+        if (!callbackContext.isCanaryDeleteStarted()) {
             return deleteCanary(model, callbackContext, proxy, request, syntheticsClient);
         }
 
         //Canary deletion has started. Wait for deletion to stabilize
-        if (callbackContext.isCanaryDeleteStarted() && !callbackContext.isCanaryDeleteStabilized()) {
+        if (!callbackContext.isCanaryDeleteStabilized()) {
             return updateCanaryDeleteProgress(model, callbackContext, proxy, request, syntheticsClient);
         }
 
@@ -74,18 +75,10 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                                                                        final AmazonWebServicesClientProxy proxy,
                                                                        final ResourceHandlerRequest<ResourceModel> request,
                                                                        final SyntheticsClient syntheticsClient) {
-
-        final GetCanaryResponse getCanaryResponse;
-        // Validate if canary that is to be deleted is in the correct state, else throw error
-        final GetCanaryRequest getCanaryRequest = GetCanaryRequest.builder().name(model.getName()).build();
-
         final DeleteCanaryRequest deleteCanaryRequest = DeleteCanaryRequest.builder()
                 .name(model.getName())
                 .build();
         try {
-            getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
-            Canary canary = getCanaryResponse.canary();
-            // At this point, Canary is already in the STOPPED or READY state for deletion
             proxy.injectCredentialsAndInvokeV2(deleteCanaryRequest, syntheticsClient::deleteCanary);
             callbackContext.setCanaryDeleteStarted(true);
         } catch (final ResourceNotFoundException resourceNotFoundException) {
@@ -110,7 +103,6 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                                                                                       final AmazonWebServicesClientProxy proxy,
                                                                                       final ResourceHandlerRequest<ResourceModel> request,
                                                                                       final SyntheticsClient syntheticsClient) {
-
         callbackContext.setCanaryStopStarted(true);
         final GetCanaryResponse getCanaryResponse;
         // Validate if canary that is to be deleted is in the correct state, else throw error
@@ -119,7 +111,7 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
             Canary canary = getCanaryResponse.canary();
             // Canary is in the RUNNING state. Need to STOP first
-            if (canary.status().stateAsString().compareTo(CanaryStates.RUNNING.toString()) == 0) {
+            if (canary.status().state() == CanaryState.RUNNING) {
                 StopCanaryRequest stopCanaryRequest = StopCanaryRequest.builder().name(canary.name()).build();
                 proxy.injectCredentialsAndInvokeV2(stopCanaryRequest, syntheticsClient::stopCanary);
             }
@@ -164,8 +156,7 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                                                                                      final CallbackContext callbackContext,
                                                                                      final AmazonWebServicesClientProxy proxy,
                                                                                      final ResourceHandlerRequest<ResourceModel> request,
-                                                                                     final SyntheticsClient syntheticsClient
-    ) {
+                                                                                     final SyntheticsClient syntheticsClient) {
         boolean canaryDeletionState = checkDeleteStabilization(model, proxy, callbackContext, syntheticsClient);
         callbackContext.setCanaryCreationStablized(canaryDeletionState);
         callbackContext.incrementRetryTimes();
@@ -219,10 +210,8 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
 
         try {
             GetCanaryResponse getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest, syntheticsClient::getCanary);
-            String canaryState = getCanaryResponse.canary().status().stateAsString();
-            if (canaryState.compareTo(CanaryStates.READY.toString()) == 0
-                    || canaryState.compareTo(CanaryStates.STOPPED.toString()) == 0
-            ) {
+            CanaryState canaryState = getCanaryResponse.canary().status().state();
+            if (canaryState == CanaryState.READY || canaryState == CanaryState.STOPPED) {
                 return true;
             }
         } catch (CfnInvalidRequestException cfnInvalidRequestException) {

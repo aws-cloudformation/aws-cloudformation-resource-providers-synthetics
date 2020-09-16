@@ -5,7 +5,6 @@ import software.amazon.awssdk.services.synthetics.model.GetCanaryRequest;
 import software.amazon.awssdk.services.synthetics.model.GetCanaryResponse;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
-import software.amazon.awssdk.services.synthetics.model.ValidationException;
 import software.amazon.cloudformation.exceptions.CfnNotFoundException;
 import software.amazon.cloudformation.proxy.*;
 
@@ -34,8 +33,6 @@ public class ReadHandler extends BaseHandler<CallbackContext> {
             logger.log(
                     String.format("%s [%s] ResourceNotFound exception while GetCanary API was called", ResourceModel.TYPE_NAME, model.getName()));
             throw new CfnNotFoundException(ResourceModel.TYPE_NAME, model.getName());
-        } catch (ValidationException ex) {
-            logger.log(String.format("%s [%s] GetCanary Failed", ResourceModel.TYPE_NAME, model.getName()));
         } catch (Exception ex) {
             logger.log(String.format("%s [%s] GetCanary Failed", ResourceModel.TYPE_NAME, model.getName()));
         }

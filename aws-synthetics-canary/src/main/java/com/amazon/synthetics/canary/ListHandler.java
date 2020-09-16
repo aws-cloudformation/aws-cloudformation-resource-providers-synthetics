@@ -14,8 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ListHandler extends BaseHandler<CallbackContext> {
-
-    Logger logger;
+    private Logger logger;
     private SyntheticsClient syntheticsClient;
 
   @Override
@@ -33,7 +32,6 @@ public class ListHandler extends BaseHandler<CallbackContext> {
               CallbackContext.builder()
                       .build() :
               callbackContext;
-
 
       // This Lambda will continually be re-invoked with the current state of the instance, finally succeeding when state stabilizes.
       return ProgressEvent.<ResourceModel, CallbackContext>builder()
