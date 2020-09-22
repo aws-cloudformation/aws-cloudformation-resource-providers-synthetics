@@ -1,5 +1,6 @@
 package com.amazon.synthetics.canary;
 
+import com.google.common.base.Strings;
 import java.util.Objects;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
@@ -60,6 +61,14 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
 
         Canary canary = getCanaryRecord(model, proxy, syntheticsClient);
         CanaryState canaryState = canary.status().state();
+
+        if (!Strings.isNullOrEmpty(canary.status().stateReason())) {
+            return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                .errorCode(HandlerErrorCode.GeneralServiceException)
+                .message(canary.status().stateReason())
+                .status(OperationStatus.FAILED)
+                .build();
+        }
 
         if (model.getStartCanaryAfterCreation()) {
             if (canaryState != CanaryState.RUNNING) {
