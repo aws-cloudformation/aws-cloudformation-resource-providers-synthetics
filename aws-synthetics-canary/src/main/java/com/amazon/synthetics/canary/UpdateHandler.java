@@ -151,7 +151,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 memoryInMB = model.getRunConfig().getMemoryInMB();
             }
             
-            if(model.getRunConfig().getActiveTracing() != null && !Objects.equals(activeTracing, model.getRunConfig().getActiveTracing())) {
+            if (model.getRunConfig().getActiveTracing() != null && !Objects.equals(activeTracing, model.getRunConfig().getActiveTracing())) {
                     logger.log("Updating active tracing");
                     activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
                 }

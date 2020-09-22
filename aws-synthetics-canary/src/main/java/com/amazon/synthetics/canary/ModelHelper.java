@@ -45,6 +45,7 @@ public class ModelHelper {
         model.setState(canary.status().stateAsString());
         model.setRunConfig(RunConfig.builder().timeoutInSeconds(
                 canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null)
+                .activeTracing(canary.runConfig() != null && canary.runConfig().activeTracing() != null ? canary.runConfig().activeTracing() : null)
                 .build());
 
         return model;
