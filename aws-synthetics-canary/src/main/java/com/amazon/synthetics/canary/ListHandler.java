@@ -14,9 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ListHandler extends BaseHandler<CallbackContext> {
-    private Logger logger;
-    private SyntheticsClient syntheticsClient;
-
   @Override
   public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
           final AmazonWebServicesClientProxy proxy,
@@ -24,14 +21,9 @@ public class ListHandler extends BaseHandler<CallbackContext> {
           final CallbackContext callbackContext,
           final Logger logger) {
 
-      syntheticsClient = ClientBuilder.getClient();
+      SyntheticsClient syntheticsClient = ClientBuilder.getClient();
 
-      final List<ResourceModel> models = listAllCanaries(proxy, syntheticsClient, request);
-
-      final CallbackContext currentContext = callbackContext == null ?
-              CallbackContext.builder()
-                      .build() :
-              callbackContext;
+      final List<ResourceModel> models = listAllCanaries(proxy, syntheticsClient, request, logger);
 
       // This Lambda will continually be re-invoked with the current state of the instance, finally succeeding when state stabilizes.
       return ProgressEvent.<ResourceModel, CallbackContext>builder()
@@ -43,7 +35,8 @@ public class ListHandler extends BaseHandler<CallbackContext> {
 
     private List<ResourceModel> listAllCanaries(final AmazonWebServicesClientProxy proxy,
                                                 final SyntheticsClient syntheticsClient,
-                                                final ResourceHandlerRequest<ResourceModel> request) {
+                                                final ResourceHandlerRequest<ResourceModel> request,
+                                                final Logger logger) {
         List<ResourceModel> models = new ArrayList<>();
         final DescribeCanariesRequest describeCanariesRequest = DescribeCanariesRequest.builder()
                 .nextToken(request.getNextToken())
@@ -60,8 +53,7 @@ public class ListHandler extends BaseHandler<CallbackContext> {
                models.add(model);
            });
        } catch (ValidationException ex) {
-           logger.log(
-                   String.format("%s [%s] Validation exception while DescribeCanaries", ResourceModel.TYPE_NAME, ex.getMessage()));
+           logger.log(String.format("%s [%s] Validation exception while DescribeCanaries", ResourceModel.TYPE_NAME, ex.getMessage()));
            throw new CfnInvalidRequestException(ex.getMessage());
        } catch (SyntheticsException ex) {
            logger.log(String.format("%s [%s] Describe Failed", ResourceModel.TYPE_NAME, ex.getMessage()));
