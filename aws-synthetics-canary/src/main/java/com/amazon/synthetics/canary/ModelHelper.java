@@ -18,12 +18,11 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-
 public class ModelHelper {
     private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
     private static final String JS_SUFFIX = ".js";
-    private static String ADD_TAGS = "ADD_TAGS";
-    private static String REMOVE_TAGS = "REMOVE_TAGS";
+    private static final String ADD_TAGS = "ADD_TAGS";
+    private static final String REMOVE_TAGS = "REMOVE_TAGS";
 
     public static ResourceModel constructModel(Canary canary, ResourceModel model) {
         Map<String, String> tags = canary.tags();
@@ -35,18 +34,25 @@ public class ModelHelper {
         model.setFailureRetentionPeriod(canary.failureRetentionPeriodInDays());
         model.setSuccessRetentionPeriod(canary.successRetentionPeriodInDays());
         model.setRuntimeVersion(canary.runtimeVersion());
+        model.setState(canary.status().stateAsString());
 
         model.setCode(buildCodeObject(canary.code()));
         model.setSchedule(buildCanaryScheduleObject(canary.schedule()));
         // Tags are optional. Check for null
         model.setTags(tags != null ? buildTagObject(tags) : null);
+
         // VPC Config is optional. Check for null
-        model.setVPCConfig(canary.vpcConfig() != null ? buildVpcConfigObject(canary.vpcConfig()) : null);
-        model.setState(canary.status().stateAsString());
-        model.setRunConfig(RunConfig.builder().timeoutInSeconds(
-                canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null)
-                .activeTracing(canary.runConfig() != null && canary.runConfig().activeTracing() != null ? canary.runConfig().activeTracing() : null)
+        if (!CanaryHelper.isNullOrEmpty(canary.vpcConfig())) {
+            model.setVPCConfig(buildVpcConfigObject(canary.vpcConfig()));
+        }
+
+        if (!CanaryHelper.isNullOrEmpty(canary.runConfig())) {
+            model.setRunConfig(RunConfig.builder()
+                .timeoutInSeconds(canary.runConfig().timeoutInSeconds())
+                .memoryInMB(canary.runConfig().memoryInMB())
+                .activeTracing(canary.runConfig().activeTracing())
                 .build());
+        }
 
         return model;
     }
