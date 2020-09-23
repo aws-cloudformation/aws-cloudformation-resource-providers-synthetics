@@ -28,6 +28,9 @@ public class CallbackContext {
     private boolean canaryStopStarted;
     private boolean canaryStopStabilized;
 
+    private String retryKey;
+    private int remainingRetryCount;
+
     @JsonPOJOBuilder(withPrefix = "")
     public static class CallbackContextBuilder {
     }
@@ -36,10 +39,6 @@ public class CallbackContext {
     public void incrementRetryTimes() {
         stabilizationRetryTimes++;
     }
-
-
-    private String retryKey;
-    private int remainingRetryCount;
 
     public void throwIfRetryLimitExceeded(int retryCount, String retryKey, ResourceModel model) {
         if (!Objects.equals(this.retryKey, retryKey)) {

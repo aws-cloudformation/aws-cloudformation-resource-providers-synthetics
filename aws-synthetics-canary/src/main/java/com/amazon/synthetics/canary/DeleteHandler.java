@@ -47,7 +47,6 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             return waitingForCanaryStateTransition(message, currentContext, model);
         } else if (canary.status().state() == CanaryState.RUNNING) {
             String message = String.format("[DELETE] Canary %s is in state RUNNING. It must be stopped before it can be deleted.", canary.name());
-
             try {
                 // Handle race condition where an external process calls StopCanary before we do.
                 proxy.injectCredentialsAndInvokeV2(
@@ -58,37 +57,40 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             } catch (ConflictException e) {
                 logger.log(String.format("[DELETE] Caught ConflictException when trying to stop canary %s.", canary.name()));
             }
-
             return waitingForCanaryStateTransition(message, currentContext, model);
         } else {
-            // The canary will be deleted once DeleteCanary returns.
-            logger.log(String.format("[DELETE] Deleting canary %s.", canary.name()));
-
-            try {
-                proxy.injectCredentialsAndInvokeV2(
-                    DeleteCanaryRequest.builder()
-                        .name(canary.name())
-                        .build(),
-                    syntheticsClient::deleteCanary);
-            } catch (ResourceNotFoundException e) {
-                // Handle race condition where an external process calls DeleteCanary before we do.
-                if (CanaryHelper.getCanaryOrNull(proxy, syntheticsClient, canary.name()) == null) {
-                    // Success
-                    return ProgressEvent.defaultSuccessHandler(null);
-                }
-            } catch (ConflictException e) {
-                // Handle race condition where an external process is mutating the canary while we
-                // are trying to delete it.
-                throw new CfnResourceConflictException(
-                    ResourceModel.TYPE_NAME,
-                    canary.name(),
-                    "The canary state changed unexpectedly.",
-                    e);
-            }
-
-            logger.log(String.format("[DELETE] Deleted canary %s.", canary.name()));
-            return ProgressEvent.defaultSuccessHandler(null);
+            return deleteCanary(proxy, logger, syntheticsClient, canary);
         }
+    }
+
+    private ProgressEvent<ResourceModel, CallbackContext> deleteCanary(AmazonWebServicesClientProxy proxy, Logger logger, SyntheticsClient syntheticsClient, Canary canary) {
+        // The canary will be deleted once DeleteCanary returns.
+        logger.log(String.format("[DELETE] Deleting canary %s.", canary.name()));
+
+        try {
+            proxy.injectCredentialsAndInvokeV2(
+                DeleteCanaryRequest.builder()
+                    .name(canary.name())
+                    .build(),
+                syntheticsClient::deleteCanary);
+        } catch (ResourceNotFoundException e) {
+            // Handle race condition where an external process calls DeleteCanary before we do.
+            if (CanaryHelper.getCanaryOrNull(proxy, syntheticsClient, canary.name()) == null) {
+                // Success
+                return ProgressEvent.defaultSuccessHandler(null);
+            }
+        } catch (ConflictException e) {
+            // Handle race condition where an external process is mutating the canary while we
+            // are trying to delete it.
+            throw new CfnResourceConflictException(
+                ResourceModel.TYPE_NAME,
+                canary.name(),
+                "The canary state changed unexpectedly.",
+                e);
+        }
+
+        logger.log(String.format("[DELETE] Deleted canary %s.", canary.name()));
+        return ProgressEvent.defaultSuccessHandler(null);
     }
 
     private ProgressEvent<ResourceModel, CallbackContext> waitingForCanaryStateTransition(String message, CallbackContext context, ResourceModel model) {

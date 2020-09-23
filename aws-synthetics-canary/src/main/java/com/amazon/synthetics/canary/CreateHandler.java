@@ -49,21 +49,14 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
         if (canary.status().state() == CanaryState.CREATING) {
             currentContext.throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "CREATING", model);
             logger.log(String.format("[CREATE] Canary %s is in state CREATING.", canary.name()));
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .message("Creating canary")
-                .callbackContext(currentContext)
-                .resourceModel(model)
-                .status(OperationStatus.IN_PROGRESS)
-                .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
-                .build();
+            return progressWithMessage("Creating canary", currentContext, model);
         } else if (canary.status().state() == CanaryState.ERROR) {
             logger.log(String.format("[CREATE] Canary %s is in state ERROR. %s", canary.name(), canary.status().stateReason()));
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .message(canary.status().stateReason())
-                .callbackContext(currentContext)
-                .resourceModel(model)
-                .status(OperationStatus.FAILED)
-                .build();
+            return ProgressEvent.failed(
+                model,
+                currentContext,
+                HandlerErrorCode.GeneralServiceException,
+                canary.status().stateReason());
         } else if (canary.status().state() == CanaryState.READY) {
             currentContext.throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "READY", model);
             logger.log(String.format("[CREATE] Canary %s is in state READY.", canary.name()));
@@ -74,26 +67,14 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                         .name(canary.name())
                         .build(),
                     syntheticsClient::startCanary);
-                return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .message("Starting canary")
-                    .callbackContext(currentContext)
-                    .resourceModel(model)
-                    .status(OperationStatus.IN_PROGRESS)
-                    .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
-                    .build();
+                return progressWithMessage("Starting canary", currentContext, model);
             } else {
                 return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
             }
         } else if (canary.status().state() == CanaryState.STARTING) {
             currentContext.throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "STARTING", model);
             logger.log(String.format("[CREATE] Canary %s is in state STARTING.", canary.name()));
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .message("Starting canary")
-                .callbackContext(currentContext)
-                .resourceModel(model)
-                .status(OperationStatus.IN_PROGRESS)
-                .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
-                .build();
+            return progressWithMessage("Starting canary", currentContext, model);
         } else {
             return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
         }
@@ -174,6 +155,16 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                 .status(OperationStatus.IN_PROGRESS)
                 .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
                 .build();
+    }
+
+    private ProgressEvent<ResourceModel, CallbackContext> progressWithMessage(String message, CallbackContext context, ResourceModel model) {
+        return ProgressEvent.<ResourceModel, CallbackContext>builder()
+            .message(message)
+            .callbackContext(context)
+            .resourceModel(model)
+            .status(OperationStatus.IN_PROGRESS)
+            .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
+            .build();
     }
 }
 
