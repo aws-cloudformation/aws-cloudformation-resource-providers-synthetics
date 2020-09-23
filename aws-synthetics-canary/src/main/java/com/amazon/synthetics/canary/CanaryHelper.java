@@ -1,8 +1,15 @@
 package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
+import software.amazon.awssdk.services.synthetics.SyntheticsClient;
+import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryRunConfigOutput;
+import software.amazon.awssdk.services.synthetics.model.GetCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.GetCanaryResponse;
+import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.synthetics.model.VpcConfigOutput;
+import software.amazon.cloudformation.exceptions.CfnNotFoundException;
+import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 
 public class CanaryHelper {
     /**
@@ -30,5 +37,34 @@ public class CanaryHelper {
 
         return runConfigOutput.timeoutInSeconds() == null
             && runConfigOutput.memoryInMB() == null;
+    }
+
+    public static Canary getCanaryOrNull(AmazonWebServicesClientProxy proxy,
+                                         SyntheticsClient syntheticsClient,
+                                         String canaryName) {
+        try {
+            return getCanaryOrThrow(proxy, syntheticsClient, canaryName);
+        } catch (ResourceNotFoundException e) {
+            return null;
+        }
+    }
+    public static Canary getCanaryOrThrow(AmazonWebServicesClientProxy proxy,
+                                          SyntheticsClient syntheticsClient,
+                                          ResourceModel model) {
+        return getCanaryOrThrow(proxy, syntheticsClient, model.getPrimaryIdentifier().getString(ResourceModel.IDENTIFIER_KEY_NAME));
+    }
+    public static Canary getCanaryOrThrow(AmazonWebServicesClientProxy proxy,
+                                          SyntheticsClient syntheticsClient,
+                                          String canaryName) {
+        try {
+            GetCanaryResponse response = proxy.injectCredentialsAndInvokeV2(
+                GetCanaryRequest.builder()
+                    .name(canaryName)
+                    .build(),
+                syntheticsClient::getCanary);
+            return response.canary();
+        } catch (ResourceNotFoundException e) {
+            throw new CfnNotFoundException(ResourceModel.TYPE_NAME, canaryName, e);
+        }
     }
 }
