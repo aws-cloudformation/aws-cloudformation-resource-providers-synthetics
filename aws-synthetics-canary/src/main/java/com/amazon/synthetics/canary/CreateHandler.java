@@ -122,9 +122,11 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             memoryInMb = model.getRunConfig().getMemoryInMB() != null ?
                     model.getRunConfig().getMemoryInMB() : DEFAULT_MEMORY_IN_MB;
 
+
             canaryRunConfigInput = CanaryRunConfigInput.builder()
                     .timeoutInSeconds(model.getRunConfig().getTimeoutInSeconds())
                     .memoryInMB(memoryInMb)
+                    .activeTracing(Boolean.TRUE.equals(model.getRunConfig().getActiveTracing()))
                     .build();
         }
 

@@ -16,6 +16,7 @@
     "/StartCanaryAfterCreation": false,
     "/RunConfig/TimeoutInSeconds": 60,
     "/RunConfig/MemoryInMB": null,
+    "/RunConfig/ActiveTracing": null,
     "/VpcConfig": null,
     "/Tags": [
       {

@@ -20,6 +20,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
     private ResourceHandlerRequest<ResourceModel> request;
     private SyntheticsClient syntheticsClient;
 
+
     @Override
     public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
             final AmazonWebServicesClientProxy proxy,
@@ -116,6 +117,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         String scheduleExpression = canary.schedule().expression();
         String durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : "";
         Integer timeoutInSeconds = canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null;
+        Boolean activeTracing = canary.runConfig() != null && canary.runConfig().activeTracing() != null ? canary.runConfig().activeTracing() : false;
         Integer memoryInMB = canary.runConfig() != null ? canary.runConfig().memoryInMB() : null;
         Integer successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
         Integer failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
@@ -148,6 +150,11 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
                 logger.log("Updating memory");
                 memoryInMB = model.getRunConfig().getMemoryInMB();
             }
+            
+            if (model.getRunConfig().getActiveTracing() != null && !Objects.equals(activeTracing, model.getRunConfig().getActiveTracing())) {
+                    logger.log("Updating active tracing");
+                    activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
+                }
         }
 
         if (model.getVPCConfig() != null) {
@@ -193,6 +200,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         final CanaryRunConfigInput canaryRunConfigInput = CanaryRunConfigInput.builder()
                 .timeoutInSeconds(timeoutInSeconds)
                 .memoryInMB(memoryInMB)
+                .activeTracing(activeTracing)
                 .build();
 
         final UpdateCanaryRequest updateCanaryRequest = UpdateCanaryRequest.builder()
