@@ -1,42 +1,31 @@
 package com.amazon.synthetics.canary;
 
-import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
+import software.amazon.cloudformation.Action;
 import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
 import software.amazon.cloudformation.exceptions.CfnInvalidRequestException;
-import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
-import software.amazon.cloudformation.proxy.Logger;
 import software.amazon.cloudformation.proxy.ProgressEvent;
-import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 import software.amazon.cloudformation.proxy.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class ListHandler extends BaseHandler<CallbackContext> {
-  @Override
-  public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
-          final AmazonWebServicesClientProxy proxy,
-          final ResourceHandlerRequest<ResourceModel> request,
-          final CallbackContext callbackContext,
-          final Logger logger) {
+public class ListHandler extends CanaryActionHandler {
+    public ListHandler() {
+        super(Action.LIST);
+    }
 
-      SyntheticsClient syntheticsClient = ClientBuilder.getClient();
+    @Override
+    protected ProgressEvent<ResourceModel, CallbackContext> handleRequest() {
+        List<ResourceModel> models = listAllCanaries();
+        return ProgressEvent.<ResourceModel, CallbackContext>builder()
+            .resourceModels(models)
+            .nextToken(request.getNextToken())
+            .status(OperationStatus.SUCCESS)
+            .build();
+    }
 
-      final List<ResourceModel> models = listAllCanaries(proxy, syntheticsClient, request, logger);
-
-      // This Lambda will continually be re-invoked with the current state of the instance, finally succeeding when state stabilizes.
-      return ProgressEvent.<ResourceModel, CallbackContext>builder()
-              .resourceModels(models)
-              .nextToken(request.getNextToken())
-              .status(OperationStatus.SUCCESS)
-              .build();
-  }
-
-    private List<ResourceModel> listAllCanaries(final AmazonWebServicesClientProxy proxy,
-                                                final SyntheticsClient syntheticsClient,
-                                                final ResourceHandlerRequest<ResourceModel> request,
-                                                final Logger logger) {
+    private List<ResourceModel> listAllCanaries() {
         List<ResourceModel> models = new ArrayList<>();
         final DescribeCanariesRequest describeCanariesRequest = DescribeCanariesRequest.builder()
                 .nextToken(request.getNextToken())
@@ -53,10 +42,10 @@ public class ListHandler extends BaseHandler<CallbackContext> {
                models.add(model);
            });
        } catch (ValidationException ex) {
-           logger.log(String.format("%s [%s] Validation exception while DescribeCanaries", ResourceModel.TYPE_NAME, ex.getMessage()));
+           log(String.format("Validation exception from DescribeCanaries: %s", ex.getMessage()));
            throw new CfnInvalidRequestException(ex.getMessage());
        } catch (SyntheticsException ex) {
-           logger.log(String.format("%s [%s] Describe Failed", ResourceModel.TYPE_NAME, ex.getMessage()));
+           log(String.format("DescribeCanaries failed: %s", ex.getMessage()));
            throw new CfnGeneralServiceException(ex.getMessage());
        }
        request.setNextToken(describeCanariesResponse.nextToken());

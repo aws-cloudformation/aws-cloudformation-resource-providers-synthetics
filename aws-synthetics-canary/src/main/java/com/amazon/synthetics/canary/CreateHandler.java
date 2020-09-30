@@ -1,7 +1,6 @@
 package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
-import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.CanaryState;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeInput;
@@ -12,80 +11,66 @@ import software.amazon.awssdk.services.synthetics.model.CreateCanaryRequest;
 import software.amazon.awssdk.services.synthetics.model.ValidationException;
 import software.amazon.awssdk.services.synthetics.model.StartCanaryRequest;
 
+import software.amazon.cloudformation.Action;
 import software.amazon.cloudformation.exceptions.*;
 import software.amazon.cloudformation.proxy.*;
 
-public class CreateHandler extends BaseHandler<CallbackContext> {
+public class CreateHandler extends CanaryActionHandler {
     private static final int DEFAULT_CALLBACK_DELAY_SECONDS = 10;
     private static final int MAX_RETRY_TIMES = 30;
     private static final int DEFAULT_MEMORY_IN_MB = 960;
 
+    public CreateHandler() {
+        super(Action.CREATE);
+    }
+
     @Override
-    public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
-        final AmazonWebServicesClientProxy proxy,
-        final ResourceHandlerRequest<ResourceModel> request,
-        final CallbackContext callbackContext,
-        final Logger logger) {
-
-        final ResourceModel model = request.getDesiredResourceState();
-        final CallbackContext currentContext = callbackContext == null ?
-            CallbackContext.builder().build() :
-            callbackContext;
-        SyntheticsClient syntheticsClient = ClientBuilder.getClient();
-
-        logger.log(String.format("[CREATE] Create handler called for canary %s. RetryKey = %s and RemainingRetryCount = %d.",
-            model.getName(), currentContext.getRetryKey(), currentContext.getRemainingRetryCount()));
-
-        if (!currentContext.isCanaryCreationStarted()) {
+    protected ProgressEvent<ResourceModel, CallbackContext> handleRequest() {
+        if (!context.isCanaryCreationStarted()) {
             // Creation has yet to begin
 
-            logger.log(String.format("[CREATE] Creating canary %s.", model.getName()));
-            currentContext.setCanaryCreationStarted(true);
+            log("Creating canary.");
+            context.setCanaryCreationStarted(true);
 
-            return createCanary(model, currentContext, proxy, request, syntheticsClient);
+            return createCanary();
         }
 
-        Canary canary = CanaryHelper.getCanaryOrThrow(proxy, syntheticsClient, model);
+        Canary canary = getCanaryOrThrow();
         if (canary.status().state() == CanaryState.CREATING) {
-            currentContext.throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "CREATING", model);
-            logger.log(String.format("[CREATE] Canary %s is in state CREATING.", canary.name()));
-            return progressWithMessage("Creating canary", currentContext, model);
+            throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "CREATING");
+            log("Canary is in state CREATING.");
+            return progressWithMessage("Creating canary");
         } else if (canary.status().state() == CanaryState.ERROR) {
-            logger.log(String.format("[CREATE] Canary %s is in state ERROR. %s", canary.name(), canary.status().stateReason()));
+            log(String.format("Canary is in state ERROR. %s", canary.status().stateReason()));
             return ProgressEvent.failed(
                 model,
-                currentContext,
+                context,
                 HandlerErrorCode.GeneralServiceException,
                 canary.status().stateReason());
         } else if (canary.status().state() == CanaryState.READY) {
-            currentContext.throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "READY", model);
-            logger.log(String.format("[CREATE] Canary %s is in state READY.", canary.name()));
+            throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "READY");
+            log("Canary is in state READY.");
             if (model.getStartCanaryAfterCreation()) {
-                logger.log(String.format("[CREATE] Starting canary %s.", canary.name()));
+                log("Starting canary.");
                 proxy.injectCredentialsAndInvokeV2(
                     StartCanaryRequest.builder()
                         .name(canary.name())
                         .build(),
                     syntheticsClient::startCanary);
-                return progressWithMessage("Starting canary", currentContext, model);
+                return progressWithMessage("Starting canary");
             } else {
                 return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
             }
         } else if (canary.status().state() == CanaryState.STARTING) {
-            currentContext.throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "STARTING", model);
-            logger.log(String.format("[CREATE] Canary %s is in state STARTING.", canary.name()));
-            return progressWithMessage("Starting canary", currentContext, model);
+            throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "STARTING");
+            log("Canary is in state STARTING.");
+            return progressWithMessage("Starting canary");
         } else {
             return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
         }
     }
 
-    private ProgressEvent<ResourceModel, CallbackContext> createCanary(final ResourceModel model,
-                                                                       final CallbackContext callbackContext,
-                                                                       final AmazonWebServicesClientProxy proxy,
-                                                                       final ResourceHandlerRequest<ResourceModel> request,
-                                                                       final SyntheticsClient syntheticsClient) {
-
+    private ProgressEvent<ResourceModel, CallbackContext> createCanary() {
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
                 .handler(model.getCode().getHandler())
                 .s3Bucket(model.getCode().getS3Bucket())
@@ -148,16 +133,16 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
             throw new CfnGeneralServiceException(e.getMessage());
         }
 
-        callbackContext.setCanaryCreationStarted(true);
+        context.setCanaryCreationStarted(true);
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .callbackContext(callbackContext)
+                .callbackContext(context)
                 .resourceModel(model)
                 .status(OperationStatus.IN_PROGRESS)
                 .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
                 .build();
     }
 
-    private ProgressEvent<ResourceModel, CallbackContext> progressWithMessage(String message, CallbackContext context, ResourceModel model) {
+    private ProgressEvent<ResourceModel, CallbackContext> progressWithMessage(String message) {
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
             .message(message)
             .callbackContext(context)
