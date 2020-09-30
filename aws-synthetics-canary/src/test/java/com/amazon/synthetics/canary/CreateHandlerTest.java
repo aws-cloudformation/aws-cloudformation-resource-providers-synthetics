@@ -111,10 +111,7 @@ public class CreateHandlerTest extends TestBase{
                 .build();
 
         final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryCreationStarted(true)
-                .canaryCreationStablized(true)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
+                .canaryCreateStarted(true)
                 .build();
 
         final Canary canary = Canary.builder()
@@ -174,7 +171,7 @@ public class CreateHandlerTest extends TestBase{
         // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
         final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
         final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
 
         doReturn(createCanaryResponse,
                 getCanaryResponse,
@@ -227,7 +224,7 @@ public class CreateHandlerTest extends TestBase{
         // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
         final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
         final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
 
         doReturn(createCanaryResponse,
                 getCanaryResponse,
@@ -283,7 +280,7 @@ public class CreateHandlerTest extends TestBase{
         // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
         final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
         final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
 
         doReturn(createCanaryResponse,
                 getCanaryResponse,
@@ -339,7 +336,7 @@ public class CreateHandlerTest extends TestBase{
         // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
         final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
         final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreationStarted(true).build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
 
         doReturn(createCanaryResponse,
                 getCanaryResponse,

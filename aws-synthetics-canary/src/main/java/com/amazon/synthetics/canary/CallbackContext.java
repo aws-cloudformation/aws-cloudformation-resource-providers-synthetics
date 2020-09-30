@@ -15,29 +15,14 @@ import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
 @Builder
 @JsonDeserialize(builder = CallbackContext.CallbackContextBuilder.class)
 public class CallbackContext {
-    private boolean canaryCreationStarted;
-    private boolean canaryCreationStablized;
-    private boolean canaryStartStarted;
-    private boolean canaryStartStablized;
-
-    private int stabilizationRetryTimes;
-
-    private boolean canaryUpdationStarted;
-    private boolean canaryUpdationStablized;
-
-    private boolean canaryStopStarted;
-    private boolean canaryStopStabilized;
-
+    private boolean canaryCreateStarted;
+    private boolean canaryUpdateStarted;
     private String retryKey;
     private int remainingRetryCount;
+    private CanaryState initialCanaryState;
 
     @JsonPOJOBuilder(withPrefix = "")
     public static class CallbackContextBuilder {
-    }
-
-    @JsonIgnore
-    public void incrementRetryTimes() {
-        stabilizationRetryTimes++;
     }
 
     public void throwIfRetryLimitExceeded(int retryCount, String retryKey, ResourceModel model) {

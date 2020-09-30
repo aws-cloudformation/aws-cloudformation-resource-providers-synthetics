@@ -3,6 +3,7 @@ package com.amazon.synthetics.canary;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
+import lombok.Data;
 import software.amazon.cloudformation.Action;
 import software.amazon.cloudformation.proxy.Logger;
 
@@ -38,6 +39,7 @@ public class ActionLogger {
         }
     }
 
+    @Data
     @AllArgsConstructor
     private static class Payload {
         private final Action action;

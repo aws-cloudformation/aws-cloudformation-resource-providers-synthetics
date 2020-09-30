@@ -60,10 +60,14 @@ public abstract class CanaryActionHandler extends BaseHandler<CallbackContext> {
     }
 
     protected ProgressEvent<ResourceModel, CallbackContext> waitingForCanaryStateTransition(String message, int retryCount, String retryKey) {
+        return waitingForCanaryStateTransition(message, message, retryCount, retryKey);
+    }
+    protected ProgressEvent<ResourceModel, CallbackContext> waitingForCanaryStateTransition(String message, String log, int retryCount, String retryKey) {
         throwIfRetryLimitExceeded(retryCount, retryKey);
         log(message);
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
             .resourceModel(model)
+            .callbackContext(context)
             .message(message)
             .status(OperationStatus.IN_PROGRESS)
             .callbackDelaySeconds(5)

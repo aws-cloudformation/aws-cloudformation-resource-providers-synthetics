@@ -1,13 +1,32 @@
 package com.amazon.synthetics.canary;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import software.amazon.awssdk.services.synthetics.model.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
+import software.amazon.cloudformation.proxy.Logger;
 
 public class TestBase {
+    protected static final String CANARY_NAME = "canary-name";
+    protected static final String ERROR_STATE_REASON = "Failure message";
+
+    protected AmazonWebServicesClientProxy proxy = mock(AmazonWebServicesClientProxy.class);
+    protected Logger logger = new ConsoleLogger();
+
+    private static class ConsoleLogger implements Logger {
+        @Override
+        public void log(String s) {
+            System.out.println("\u001B[36m" + s + "\u001B[m");
+        }
+    }
 
     public static ResourceModel buildModelForRead() {
         ResourceModel model = ResourceModel.builder()
@@ -129,5 +148,108 @@ public class TestBase {
         tagMap.put("test1Key", "test1Value");
         tagMap.put("test2Key", "test12Value");
         return tagMap;
+    }
+
+    protected void configureGetCanaryResponse(CanaryState state) {
+        configureGetCanaryResponse(state, null);
+    }
+
+    protected void configureGetCanaryResponse(CanaryState state, String stateReason) {
+        configureGetCanaryResponse(createCanaryWithState(state, stateReason));
+    }
+
+    protected void configureGetCanaryResponse(Canary canary) {
+        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(canary.name()).build()), any()))
+            .thenReturn(GetCanaryResponse.builder().canary(canary).build());
+    }
+
+    protected void configureGetCanaryResponse(Throwable throwable) {
+        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
+            .thenThrow(throwable);
+    }
+
+    protected static Canary createCanaryWithState(CanaryState state, String stateReason) {
+        return Canary.builder()
+            .name(CANARY_NAME)
+            .executionRoleArn("test execution arn")
+            .code(codeOutputObjectForTesting())
+            .status(CanaryStatus.builder()
+                .state(state)
+                .stateReason(stateReason)
+                .build())
+            .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).build())
+            .schedule(canaryScheduleOutputForTesting())
+            .runtimeVersion("syn-1.0")
+            .build();
+    }
+
+    protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing) {
+        return buildModel(runtimeVersion, isActiveTracing, true);
+    }
+    protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing, Boolean startCanaryAfterCreation) {
+        final Code codeObjectForTesting = new Code(null,
+            null,
+            null,
+            "var synthetics = require('Synthetics');\n" +
+                "const log = require('SyntheticsLogger');\n" +
+                "\n" +
+                "const pageLoadBlueprint = async function () {\n" +
+                "\n" +
+                "    // INSERT URL here\n" +
+                "    const URL = \"https://amazon.com\";\n" +
+                "\n" +
+                "    let page = await synthetics.getPage();\n" +
+                "    const response = await page.goto(URL, {waitUntil: 'domcontentloaded', timeout: 30000});\n" +
+                "    //Wait for page to render.\n" +
+                "    //Increase or decrease wait time based on endpoint being monitored.\n" +
+                "    await page.waitFor(15000);\n" +
+                "    await synthetics.takeScreenshot('loaded', 'loaded');\n" +
+                "    let pageTitle = await page.title();\n" +
+                "    log.info('Page title: ' + pageTitle);\n" +
+                "    if (response.status() !== 200) {\n" +
+                "        throw \"Failed to load page!\";\n" +
+                "    }\n" +
+                "};\n" +
+                "\n" +
+                "exports.handler = async () => {\n" +
+                "    return await pageLoadBlueprint();\n" +
+                "};",
+            "pageLoadBlueprint.handler");
+
+        final Schedule scheduleForTesting = new Schedule();
+        scheduleForTesting.setDurationInSeconds("3600");
+        scheduleForTesting.setExpression("rate(1 min)");
+
+        ArrayList<String> subnetIds = new ArrayList<>();
+        subnetIds.add("subnet-3a473011");
+        subnetIds.add("subnet-123f3159");
+
+        ArrayList<String> securityGroups = new ArrayList<>();
+        securityGroups.add("sg-5582b213");
+
+        final VPCConfig vpcConfig = new VPCConfig();
+        vpcConfig.setSubnetIds(subnetIds);
+        vpcConfig.setSecurityGroupIds(securityGroups);
+
+        Tag tagUpdate = Tag.builder().key("key2").value("value2").build();
+        List<Tag> listTag = new ArrayList<>();
+        listTag.add(tagUpdate);
+
+        RunConfig runConfig = RunConfig.builder().timeoutInSeconds(600).memoryInMB(960).activeTracing(isActiveTracing).build();
+
+        return ResourceModel.builder()
+            .name(CANARY_NAME)
+            .artifactS3Location("s3://cloudformation-created-bucket")
+            .code(codeObjectForTesting)
+            .executionRoleArn("arn:aws:test::myaccount")
+            .schedule(scheduleForTesting)
+            .runtimeVersion(runtimeVersion)
+            .startCanaryAfterCreation(startCanaryAfterCreation)
+            .vPCConfig(vpcConfig)
+            .tags(listTag)
+            .runConfig(runConfig)
+            .failureRetentionPeriod(31)
+            .successRetentionPeriod(31)
+            .build();
     }
 }

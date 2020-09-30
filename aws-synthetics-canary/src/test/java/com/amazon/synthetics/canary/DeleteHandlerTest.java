@@ -25,7 +25,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class DeleteHandlerTest extends TestBase {
-    private static final String CANARY_NAME = "canary-name";
     private static final ResourceHandlerRequest<ResourceModel> REQUEST = ResourceHandlerRequest.<ResourceModel>builder()
         .desiredResourceState(ResourceModel.builder()
             .name(CANARY_NAME)
@@ -34,13 +33,9 @@ public class DeleteHandlerTest extends TestBase {
 
     private DeleteHandler handler = new DeleteHandler();
 
-    private AmazonWebServicesClientProxy proxy = mock(AmazonWebServicesClientProxy.class);
-    private Logger logger = mock(Logger.class);
-
     @Test
     public void handleRequest_canaryStateIsCreating_fails() {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(CanaryState.CREATING));
+        configureGetCanaryResponse(CanaryState.CREATING);
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, null, logger);
@@ -51,8 +46,7 @@ public class DeleteHandlerTest extends TestBase {
 
     @Test
     public void handleRequest_canaryStateIsStarting_inProgress() {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(CanaryState.STARTING));
+        configureGetCanaryResponse(CanaryState.STARTING);
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, null, logger);
@@ -62,8 +56,7 @@ public class DeleteHandlerTest extends TestBase {
 
     @Test
     public void handleRequest_canaryStateIsUpdating_inProgress() {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(CanaryState.UPDATING));
+        configureGetCanaryResponse(CanaryState.UPDATING);
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, null, logger);
@@ -73,8 +66,7 @@ public class DeleteHandlerTest extends TestBase {
 
     @Test
     public void handleRequest_canaryStateIsStopping_inProgress() {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(CanaryState.STOPPING));
+        configureGetCanaryResponse(CanaryState.STOPPING);
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, null, logger);
@@ -84,8 +76,7 @@ public class DeleteHandlerTest extends TestBase {
 
     @Test
     public void handleRequest_canaryStateIsRunning_invokesStopCanary() {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(CanaryState.RUNNING));
+        configureGetCanaryResponse(CanaryState.RUNNING);
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, null, logger);
@@ -96,8 +87,7 @@ public class DeleteHandlerTest extends TestBase {
 
     @Test
     public void handleRequest_canaryStateIsRunning_invokesStopCanary_handlesConflict() {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(CanaryState.RUNNING));
+        configureGetCanaryResponse(CanaryState.RUNNING);
         when(proxy.injectCredentialsAndInvokeV2(eq(StopCanaryRequest.builder().name(CANARY_NAME).build()), any()))
             .thenThrow(ConflictException.builder().build());
 
@@ -111,8 +101,7 @@ public class DeleteHandlerTest extends TestBase {
     @ParameterizedTest
     @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
     public void handleRequest_canaryStateAllows_invokesDeleteCanary_success(CanaryState state) {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(state));
+        configureGetCanaryResponse(state);
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, null, logger);
@@ -124,8 +113,7 @@ public class DeleteHandlerTest extends TestBase {
     @ParameterizedTest
     @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
     public void handleRequest_canaryStateAllows_invokesDeleteCanary_handlesAlreadyDeleted_success(CanaryState state) {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(state));
+        configureGetCanaryResponse(state);
         when(proxy.injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any()))
             .thenThrow(ResourceNotFoundException.builder().build());
 
@@ -139,8 +127,7 @@ public class DeleteHandlerTest extends TestBase {
     @ParameterizedTest
     @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
     public void handleRequest_canaryStateAllows_invokesDeleteCanary_handlesConflict_fails(CanaryState state) {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenReturn(createResponseForCanaryWithState(state));
+        configureGetCanaryResponse(state);
         when(proxy.injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any()))
             .thenThrow(ConflictException.builder().build());
 
@@ -152,21 +139,9 @@ public class DeleteHandlerTest extends TestBase {
 
     @Test
     public void handleRequest_canaryDoesNotExist_fails() {
-        when(proxy.injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any()))
-            .thenThrow(ResourceNotFoundException.builder().build());
+        configureGetCanaryResponse(ResourceNotFoundException.builder().build());
 
         assertThatThrownBy(() -> handler.handleRequest(proxy, REQUEST, null, logger))
             .isInstanceOf(CfnNotFoundException.class);
-    }
-
-    private static GetCanaryResponse createResponseForCanaryWithState(CanaryState state) {
-        return GetCanaryResponse.builder()
-            .canary(Canary.builder()
-                .name(CANARY_NAME)
-                .status(CanaryStatus.builder()
-                    .state(state)
-                    .build())
-                .build())
-            .build();
     }
 }

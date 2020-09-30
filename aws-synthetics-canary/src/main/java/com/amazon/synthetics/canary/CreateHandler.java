@@ -26,20 +26,22 @@ public class CreateHandler extends CanaryActionHandler {
 
     @Override
     protected ProgressEvent<ResourceModel, CallbackContext> handleRequest() {
-        if (!context.isCanaryCreationStarted()) {
+        if (!context.isCanaryCreateStarted()) {
             // Creation has yet to begin
 
             log("Creating canary.");
-            context.setCanaryCreationStarted(true);
+            context.setCanaryCreateStarted(true);
 
             return createCanary();
         }
 
         Canary canary = getCanaryOrThrow();
         if (canary.status().state() == CanaryState.CREATING) {
-            throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "CREATING");
-            log("Canary is in state CREATING.");
-            return progressWithMessage("Creating canary");
+            return waitingForCanaryStateTransition(
+                "Creating canary",
+                "Canary is in state CREATING.",
+                MAX_RETRY_TIMES,
+                "CREATING");
         } else if (canary.status().state() == CanaryState.ERROR) {
             log(String.format("Canary is in state ERROR. %s", canary.status().stateReason()));
             return ProgressEvent.failed(
@@ -48,23 +50,35 @@ public class CreateHandler extends CanaryActionHandler {
                 HandlerErrorCode.GeneralServiceException,
                 canary.status().stateReason());
         } else if (canary.status().state() == CanaryState.READY) {
-            throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "READY");
             log("Canary is in state READY.");
             if (model.getStartCanaryAfterCreation()) {
-                log("Starting canary.");
+                // There is a race condition here. We will get an exception if someone calls
+                // DeleteCanary, StartCanary, or UpdateCanary before we call StartCanary.
+
                 proxy.injectCredentialsAndInvokeV2(
                     StartCanaryRequest.builder()
                         .name(canary.name())
                         .build(),
                     syntheticsClient::startCanary);
-                return progressWithMessage("Starting canary");
+
+                return waitingForCanaryStateTransition("Starting canary", MAX_RETRY_TIMES, "READY");
             } else {
                 return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
             }
         } else if (canary.status().state() == CanaryState.STARTING) {
-            throwIfRetryLimitExceeded(MAX_RETRY_TIMES, "STARTING");
-            log("Canary is in state STARTING.");
-            return progressWithMessage("Starting canary");
+            // If the customer calls StartCanary before we handle the canary in READY state,
+            // then we can end up here even when StartCanaryAfterCreation is false.
+
+            if (model.getStartCanaryAfterCreation()) {
+                return waitingForCanaryStateTransition(
+                    "Starting canary",
+                    "Canary is in state STARTING.",
+                    MAX_RETRY_TIMES,
+                    "STARTING");
+            } else {
+                log("Canary is in STARTING state even though StartCanaryAfterCreation was false.");
+                return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
+            }
         } else {
             return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
         }
@@ -133,23 +147,13 @@ public class CreateHandler extends CanaryActionHandler {
             throw new CfnGeneralServiceException(e.getMessage());
         }
 
-        context.setCanaryCreationStarted(true);
+        context.setCanaryCreateStarted(true);
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
                 .callbackContext(context)
                 .resourceModel(model)
                 .status(OperationStatus.IN_PROGRESS)
                 .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
                 .build();
-    }
-
-    private ProgressEvent<ResourceModel, CallbackContext> progressWithMessage(String message) {
-        return ProgressEvent.<ResourceModel, CallbackContext>builder()
-            .message(message)
-            .callbackContext(context)
-            .resourceModel(model)
-            .status(OperationStatus.IN_PROGRESS)
-            .callbackDelaySeconds(DEFAULT_CALLBACK_DELAY_SECONDS)
-            .build();
     }
 }
 
