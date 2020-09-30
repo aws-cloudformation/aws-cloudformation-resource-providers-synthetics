@@ -1,6 +1,5 @@
 package com.amazon.synthetics.canary;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -19,15 +18,6 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 
 public class UpdateHandlerTest extends TestBase {
-    private static final ResourceHandlerRequest<ResourceModel> REQUEST = ResourceHandlerRequest.<ResourceModel>builder()
-        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false))
-        .region("us-west-2")
-        .build();
-    private static final ResourceHandlerRequest<ResourceModel> REQUEST_START_CANARY = ResourceHandlerRequest.<ResourceModel>builder()
-        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, true))
-        .region("us-west-2")
-        .build();
-
     private UpdateHandler handler = new UpdateHandler();
 
     @Test
@@ -232,17 +222,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         assertThat(response.getMessage()).isNotNull();
         assertThat(response.getResourceModel()).isNotNull();
-    }
-
-    private ResourceHandlerRequest<ResourceModel> request;
-
-    @BeforeEach
-    public void setup() {
-        request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(buildModel("syn-1.0", null))
-                .clientRequestToken("clientRequestToken")
-                .logicalResourceIdentifier("logicIdentifier")
-                .build();
     }
 
     @Test

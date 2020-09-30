@@ -13,10 +13,20 @@ import java.util.List;
 import java.util.Map;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 import software.amazon.cloudformation.proxy.Logger;
+import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
 public class TestBase {
     protected static final String CANARY_NAME = "canary-name";
     protected static final String ERROR_STATE_REASON = "Failure message";
+
+    protected static final ResourceHandlerRequest<ResourceModel> REQUEST = ResourceHandlerRequest.<ResourceModel>builder()
+        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false))
+        .region("us-west-2")
+        .build();
+    protected static final ResourceHandlerRequest<ResourceModel> REQUEST_START_CANARY = ResourceHandlerRequest.<ResourceModel>builder()
+        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, true))
+        .region("us-west-2")
+        .build();
 
     protected AmazonWebServicesClientProxy proxy = mock(AmazonWebServicesClientProxy.class);
     protected Logger logger = new ConsoleLogger();
@@ -183,6 +193,9 @@ public class TestBase {
             .build();
     }
 
+    protected static ResourceModel buildModel() {
+        return buildModel("syn-1.0", null, true);
+    }
     protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing) {
         return buildModel(runtimeVersion, isActiveTracing, true);
     }

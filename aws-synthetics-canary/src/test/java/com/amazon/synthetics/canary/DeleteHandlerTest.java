@@ -25,12 +25,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class DeleteHandlerTest extends TestBase {
-    private static final ResourceHandlerRequest<ResourceModel> REQUEST = ResourceHandlerRequest.<ResourceModel>builder()
-        .desiredResourceState(ResourceModel.builder()
-            .name(CANARY_NAME)
-            .build())
-        .build();
-
     private DeleteHandler handler = new DeleteHandler();
 
     @Test
