@@ -115,7 +115,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
 
         String handlerName = canary.code().handler();
         String scheduleExpression = canary.schedule().expression();
-        String durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : "";
+        String durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : null;
         Integer timeoutInSeconds = canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null;
         Boolean activeTracing = canary.runConfig() != null && canary.runConfig().activeTracing() != null ? canary.runConfig().activeTracing() : false;
         Integer memoryInMB = canary.runConfig() != null ? canary.runConfig().memoryInMB() : null;
@@ -195,7 +195,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
 
         final CanaryScheduleInput canaryScheduleInput = CanaryScheduleInput.builder()
                 .expression(scheduleExpression)
-                .durationInSeconds(Long.valueOf(durationInSecs)).build();
+                .durationInSeconds(durationInSecs != null ? Long.valueOf(durationInSecs) : null).build();
 
         final CanaryRunConfigInput canaryRunConfigInput = CanaryRunConfigInput.builder()
                 .timeoutInSeconds(timeoutInSeconds)
