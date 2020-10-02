@@ -541,14 +541,7 @@ public class UpdateHandlerTest extends TestBase {
             .tags(tagExisting)
             .build();
 
-        final CallbackContext callbackContext = CallbackContext.builder()
-            .canaryUpdationStarted(false)
-            .canaryUpdationStablized(false)
-            .canaryStartStarted(true)
-            .canaryStartStablized(true)
-            .canaryStopStarted(true)
-            .canaryStopStabilized(true)
-            .build();
+        final CallbackContext callbackContext = CallbackContext.builder().build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
             .canary(canary)
@@ -562,17 +555,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-
-        final CallbackContext callbackContextUpdated = CallbackContext.builder()
-            .canaryUpdationStarted(true)
-            .canaryUpdationStablized(false)
-            .canaryStartStarted(true)
-            .canaryStartStablized(true)
-            .canaryStopStarted(true)
-            .canaryStopStabilized(true)
-            .build();
-        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(true);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
