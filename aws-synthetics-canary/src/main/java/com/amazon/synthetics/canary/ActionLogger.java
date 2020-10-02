@@ -30,7 +30,25 @@ public class ActionLogger {
             context.getRetryKey(),
             context.getRemainingRetryCount(),
             model.getName(),
-            message);
+            message,
+            null);
+        try {
+            String json = mapper.writeValueAsString(payload);
+            logger.log(json);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void log(Exception exception) {
+        Payload payload = new Payload(
+            action,
+            awsAccountId,
+            context.getRetryKey(),
+            context.getRemainingRetryCount(),
+            model.getName(),
+            null,
+            exception);
         try {
             String json = mapper.writeValueAsString(payload);
             logger.log(json);
@@ -48,5 +66,6 @@ public class ActionLogger {
         private final Integer remainingRetryCount;
         private final String resourceName;
         private final String message;
+        private final Exception exception;
     }
 }

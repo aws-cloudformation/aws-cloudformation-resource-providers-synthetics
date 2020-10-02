@@ -42,11 +42,11 @@ public class ListHandler extends CanaryActionHandler {
                models.add(model);
            });
        } catch (ValidationException ex) {
-           log(String.format("Validation exception from DescribeCanaries: %s", ex.getMessage()));
-           throw new CfnInvalidRequestException(ex.getMessage());
+           log(ex);
+           throw new CfnInvalidRequestException(ex);
        } catch (SyntheticsException ex) {
-           log(String.format("DescribeCanaries failed: %s", ex.getMessage()));
-           throw new CfnGeneralServiceException(ex.getMessage());
+           log(ex);
+           throw new CfnGeneralServiceException(ex);
        }
        request.setNextToken(describeCanariesResponse.nextToken());
        return models;

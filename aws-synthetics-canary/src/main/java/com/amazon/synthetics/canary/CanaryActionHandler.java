@@ -36,7 +36,13 @@ public abstract class CanaryActionHandler extends BaseHandler<CallbackContext> {
         this.syntheticsClient = ClientBuilder.getClient();
 
         log("Invoking handler");
-        ProgressEvent<ResourceModel, CallbackContext> response = handleRequest();
+        ProgressEvent<ResourceModel, CallbackContext> response;
+        try {
+            response = handleRequest();
+        } catch (Exception e) {
+            log(e);
+            throw e;
+        }
         log("Handler invoked");
         return response;
     }
@@ -47,12 +53,11 @@ public abstract class CanaryActionHandler extends BaseHandler<CallbackContext> {
         return CanaryHelper.getCanaryOrThrow(proxy, syntheticsClient, model);
     }
 
-    protected Canary getCanaryOrNull() {
-        return CanaryHelper.getCanaryOrNull(proxy, syntheticsClient, model.getName());
-    }
-
     protected void log(String message) {
         logger.log(message);
+    }
+    protected void log(Exception exception) {
+        logger.log(exception);
     }
 
     protected void throwIfRetryLimitExceeded(int retryCount, String retryKey) {
