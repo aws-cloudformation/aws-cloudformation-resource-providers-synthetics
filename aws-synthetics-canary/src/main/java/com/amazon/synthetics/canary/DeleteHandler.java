@@ -34,21 +34,25 @@ public class DeleteHandler extends CanaryActionHandler {
             String message = "Canary is in state STOPPING. It must finish stopping before it can be deleted.";
             return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "STOPPING");
         } else if (canary.status().state() == CanaryState.RUNNING) {
-            String message = "Canary is in state RUNNING. It must be stopped before it can be deleted.";
-            try {
-                // Handle race condition where an external process calls StopCanary before we do.
-                proxy.injectCredentialsAndInvokeV2(
-                    StopCanaryRequest.builder()
-                        .name(canary.name())
-                        .build(),
-                    syntheticsClient::stopCanary);
-            } catch (ConflictException e) {
-                log("Caught ConflictException when trying to stop canary.");
-            }
-            return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "RUNNING");
+            return handleCanaryInStateRunning(canary);
         } else {
             return deleteCanary(canary);
         }
+    }
+
+    private ProgressEvent<ResourceModel, CallbackContext> handleCanaryInStateRunning(Canary canary) {
+        String message = "Canary is in state RUNNING. It must be stopped before it can be deleted.";
+        try {
+            // Handle race condition where an external process calls StopCanary before we do.
+            proxy.injectCredentialsAndInvokeV2(
+                StopCanaryRequest.builder()
+                    .name(canary.name())
+                    .build(),
+                syntheticsClient::stopCanary);
+        } catch (ConflictException e) {
+            log("Caught ConflictException when trying to stop canary.");
+        }
+        return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "RUNNING");
     }
 
     private ProgressEvent<ResourceModel, CallbackContext> deleteCanary(Canary canary) {

@@ -50,36 +50,44 @@ public class CreateHandler extends CanaryActionHandler {
                 HandlerErrorCode.GeneralServiceException,
                 canary.status().stateReason());
         } else if (canary.status().state() == CanaryState.READY) {
-            log("Canary is in state READY.");
-            if (model.getStartCanaryAfterCreation()) {
-                // There is a race condition here. We will get an exception if someone calls
-                // DeleteCanary, StartCanary, or UpdateCanary before we call StartCanary.
-
-                proxy.injectCredentialsAndInvokeV2(
-                    StartCanaryRequest.builder()
-                        .name(canary.name())
-                        .build(),
-                    syntheticsClient::startCanary);
-
-                return waitingForCanaryStateTransition("Starting canary", MAX_RETRY_TIMES, "READY");
-            } else {
-                return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
-            }
+            return handleCanaryInStateReady(canary);
         } else if (canary.status().state() == CanaryState.STARTING) {
-            // If the customer calls StartCanary before we handle the canary in READY state,
-            // then we can end up here even when StartCanaryAfterCreation is false.
-
-            if (model.getStartCanaryAfterCreation()) {
-                return waitingForCanaryStateTransition(
-                    "Starting canary",
-                    "Canary is in state STARTING.",
-                    MAX_RETRY_TIMES,
-                    "STARTING");
-            } else {
-                log("Canary is in STARTING state even though StartCanaryAfterCreation was false.");
-                return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
-            }
+            return handleCanaryInStateStarting(canary);
         } else {
+            return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
+        }
+    }
+
+    private ProgressEvent<ResourceModel, CallbackContext> handleCanaryInStateReady(Canary canary) {
+        log("Canary is in state READY.");
+        if (model.getStartCanaryAfterCreation()) {
+            // There is a race condition here. We will get an exception if someone calls
+            // DeleteCanary, StartCanary, or UpdateCanary before we call StartCanary.
+
+            proxy.injectCredentialsAndInvokeV2(
+                StartCanaryRequest.builder()
+                    .name(canary.name())
+                    .build(),
+                syntheticsClient::startCanary);
+
+            return waitingForCanaryStateTransition("Starting canary", MAX_RETRY_TIMES, "READY");
+        } else {
+            return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
+        }
+    }
+
+    private ProgressEvent<ResourceModel, CallbackContext> handleCanaryInStateStarting(Canary canary) {
+        // If the customer calls StartCanary before we handle the canary in READY state,
+        // then we can end up here even when StartCanaryAfterCreation is false.
+
+        if (model.getStartCanaryAfterCreation()) {
+            return waitingForCanaryStateTransition(
+                "Starting canary",
+                "Canary is in state STARTING.",
+                MAX_RETRY_TIMES,
+                "STARTING");
+        } else {
+            log("Canary is in STARTING state even though StartCanaryAfterCreation was false.");
             return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
         }
     }
