@@ -1,6 +1,6 @@
 package com.amazon.synthetics.canary;
 
-import com.amazonaws.arn.Arn;
+import software.amazon.awssdk.arns.Arn;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeOutput;
@@ -127,13 +127,13 @@ public class ModelHelper {
         String accountId = request.getAwsAccountId();
         String region = request.getRegion();
         String resource = String.format("%s:%s", "canary", canaryName);
-        String partition = getPartition(region);
+        String partition = request.getAwsPartition();
 
-        Arn arn = Arn.builder().withAccountId(accountId)
-                .withPartition(partition)
-                .withRegion(region)
-                .withService("synthetics")
-                .withResource(resource)
+        Arn arn = Arn.builder().accountId(accountId)
+                .partition(partition)
+                .region(region)
+                .service("synthetics")
+                .resource(resource)
                 .build();
         return arn.toString();
     }
@@ -148,17 +148,6 @@ public class ModelHelper {
             tagMap.put(tag.getKey(), tag.getValue());
         }
         return tagMap;
-    }
-
-    private static String getPartition(String region) {
-        String partition = "aws";
-        if (region.contains("us-gov-")) {
-            partition += "-us-gov";
-        }
-        if (region.contains("cn-")) {
-            partition += "-cn";
-        }
-        return partition;
     }
 
     public static Map<String, Map<String, String>> updateTags(ResourceModel model, Map<String, String> existingTags) {
