@@ -49,7 +49,9 @@ Resources:
                 - "synthetics:GetCanary"
                 - "synthetics:ListTagsForResource"
                 - "synthetics:StartCanary"
+                - "synthetics:StopCanary"
                 - "synthetics:TagResource"
+                - "synthetics:UntagResource"
                 - "synthetics:UpdateCanary"
                 Resource: "*"
 Outputs:
