@@ -205,6 +205,14 @@ public class ModelHelper {
         store.put(REMOVE_TAGS, copyExistingTags);
         return store;
     }
+
+    public static boolean isNullOrEmpty(VPCConfig vpcConfig) {
+        return vpcConfig == null
+            || vpcConfig.getSubnetIds() == null
+            || vpcConfig.getSubnetIds().isEmpty()
+            || vpcConfig.getSecurityGroupIds() == null
+            || vpcConfig.getSecurityGroupIds().isEmpty();
+    }
 }
 
 

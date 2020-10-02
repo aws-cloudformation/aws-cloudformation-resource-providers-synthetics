@@ -193,17 +193,12 @@ public class UpdateHandler extends CanaryActionHandler {
             }
         }
 
-        if (model.getVPCConfig() != null) {
-            if (model.getVPCConfig().getSubnetIds() != null &&
-                !model.getVPCConfig().getSubnetIds().isEmpty() &&
-                model.getVPCConfig().getSecurityGroupIds() != null &&
-                !model.getVPCConfig().getSecurityGroupIds().isEmpty()) {
-                log("Updating vpcConfig");
-                vpcConfigInput = VpcConfigInput.builder()
-                    .subnetIds(model.getVPCConfig().getSubnetIds())
-                    .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
-                    .build();
-            }
+        if (!ModelHelper.isNullOrEmpty(model.getVPCConfig())) {
+            log("Updating vpcConfig");
+            vpcConfigInput = VpcConfigInput.builder()
+                .subnetIds(model.getVPCConfig().getSubnetIds())
+                .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
+                .build();
         }
 
         if (!Objects.equals(successRetentionPeriodInDays, model.getSuccessRetentionPeriod())) {
