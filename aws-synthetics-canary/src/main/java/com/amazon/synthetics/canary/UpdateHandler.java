@@ -188,9 +188,9 @@ public class UpdateHandler extends CanaryActionHandler {
             }
             
             if (model.getRunConfig().getActiveTracing() != null && !Objects.equals(activeTracing, model.getRunConfig().getActiveTracing())) {
-                    log("Updating active tracing");
-                    activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
-                }
+                log("Updating active tracing");
+                activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
+            }
         }
 
         if (model.getVPCConfig() != null) {
