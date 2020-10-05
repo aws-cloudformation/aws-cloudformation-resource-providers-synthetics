@@ -1,6 +1,6 @@
 package com.amazon.synthetics.canary;
 
-import com.amazonaws.arn.Arn;
+import software.amazon.awssdk.arns.Arn;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeOutput;
@@ -18,12 +18,11 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-
 public class ModelHelper {
     private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
     private static final String JS_SUFFIX = ".js";
-    private static String ADD_TAGS = "ADD_TAGS";
-    private static String REMOVE_TAGS = "REMOVE_TAGS";
+    private static final String ADD_TAGS = "ADD_TAGS";
+    private static final String REMOVE_TAGS = "REMOVE_TAGS";
 
     public static ResourceModel constructModel(Canary canary, ResourceModel model) {
         Map<String, String> tags = canary.tags();
@@ -35,18 +34,25 @@ public class ModelHelper {
         model.setFailureRetentionPeriod(canary.failureRetentionPeriodInDays());
         model.setSuccessRetentionPeriod(canary.successRetentionPeriodInDays());
         model.setRuntimeVersion(canary.runtimeVersion());
+        model.setState(canary.status().stateAsString());
 
         model.setCode(buildCodeObject(canary.code()));
         model.setSchedule(buildCanaryScheduleObject(canary.schedule()));
         // Tags are optional. Check for null
         model.setTags(tags != null ? buildTagObject(tags) : null);
+
         // VPC Config is optional. Check for null
-        model.setVPCConfig(canary.vpcConfig() != null ? buildVpcConfigObject(canary.vpcConfig()) : null);
-        model.setState(canary.status().stateAsString());
-        model.setRunConfig(RunConfig.builder().timeoutInSeconds(
-                canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null)
-                .activeTracing(canary.runConfig() != null && canary.runConfig().activeTracing() != null ? canary.runConfig().activeTracing() : null)
+        if (!CanaryHelper.isNullOrEmpty(canary.vpcConfig())) {
+            model.setVPCConfig(buildVpcConfigObject(canary.vpcConfig()));
+        }
+
+        if (!CanaryHelper.isNullOrEmpty(canary.runConfig())) {
+            model.setRunConfig(RunConfig.builder()
+                .timeoutInSeconds(canary.runConfig().timeoutInSeconds())
+                .memoryInMB(canary.runConfig().memoryInMB())
+                .activeTracing(canary.runConfig().activeTracing())
                 .build());
+        }
 
         return model;
     }
@@ -121,13 +127,13 @@ public class ModelHelper {
         String accountId = request.getAwsAccountId();
         String region = request.getRegion();
         String resource = String.format("%s:%s", "canary", canaryName);
-        String partition = getPartition(region);
+        String partition = request.getAwsPartition();
 
-        Arn arn = Arn.builder().withAccountId(accountId)
-                .withPartition(partition)
-                .withRegion(region)
-                .withService("synthetics")
-                .withResource(resource)
+        Arn arn = Arn.builder().accountId(accountId)
+                .partition(partition)
+                .region(region)
+                .service("synthetics")
+                .resource(resource)
                 .build();
         return arn.toString();
     }
@@ -142,17 +148,6 @@ public class ModelHelper {
             tagMap.put(tag.getKey(), tag.getValue());
         }
         return tagMap;
-    }
-
-    private static String getPartition(String region) {
-        String partition = "aws";
-        if (region.contains("us-gov-")) {
-            partition += "-us-gov";
-        }
-        if (region.contains("cn-")) {
-            partition += "-cn";
-        }
-        return partition;
     }
 
     public static Map<String, Map<String, String>> updateTags(ResourceModel model, Map<String, String> existingTags) {
@@ -209,6 +204,14 @@ public class ModelHelper {
         // Store all the tags that need to be removed to the canary
         store.put(REMOVE_TAGS, copyExistingTags);
         return store;
+    }
+
+    public static boolean isNullOrEmpty(VPCConfig vpcConfig) {
+        return vpcConfig == null
+            || vpcConfig.getSubnetIds() == null
+            || vpcConfig.getSubnetIds().isEmpty()
+            || vpcConfig.getSecurityGroupIds() == null
+            || vpcConfig.getSecurityGroupIds().isEmpty();
     }
 }
 

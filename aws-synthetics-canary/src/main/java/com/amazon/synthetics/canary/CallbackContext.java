@@ -1,5 +1,6 @@
 package com.amazon.synthetics.canary;
 
+import java.util.Objects;
 import lombok.Builder;
 import lombok.Data;
 
@@ -8,34 +9,31 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 
 import software.amazon.awssdk.services.synthetics.model.*;
+import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
 
 @Data
 @Builder
 @JsonDeserialize(builder = CallbackContext.CallbackContextBuilder.class)
 public class CallbackContext {
-    private boolean canaryCreationStarted;
-    private boolean canaryCreationStablized;
-    private boolean canaryStartStarted;
-    private boolean canaryStartStablized;
-
-    private int stabilizationRetryTimes;
-
-    private boolean canaryUpdationStarted;
-    private boolean canaryUpdationStablized;
-
-    private boolean canaryDeleteStarted;
-    private boolean canaryDeleteStabilized;
-
-    private boolean canaryStopStarted;
-    private boolean canaryStopStabilized;
+    private boolean canaryCreateStarted;
+    private boolean canaryUpdateStarted;
+    private String retryKey;
+    private int remainingRetryCount;
+    private CanaryState initialCanaryState;
 
     @JsonPOJOBuilder(withPrefix = "")
     public static class CallbackContextBuilder {
     }
 
-    @JsonIgnore
-    public void incrementRetryTimes() {
-        stabilizationRetryTimes++;
-    }
+    public void throwIfRetryLimitExceeded(int retryCount, String retryKey, ResourceModel model) {
+        if (!Objects.equals(this.retryKey, retryKey)) {
+            this.retryKey = retryKey;
+            remainingRetryCount = retryCount;
+        }
 
+        --remainingRetryCount;
+        if (remainingRetryCount == 0) {
+            throw new CfnNotStabilizedException(ResourceModel.TYPE_NAME, model.getName());
+        }
+    }
 }

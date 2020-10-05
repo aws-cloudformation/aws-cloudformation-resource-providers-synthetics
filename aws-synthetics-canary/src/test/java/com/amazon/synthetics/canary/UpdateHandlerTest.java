@@ -1,118 +1,227 @@
 package com.amazon.synthetics.canary;
 
-import org.joda.time.DateTime;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import software.amazon.awssdk.services.synthetics.model.*;
+import software.amazon.cloudformation.exceptions.CfnNotFoundException;
 import software.amazon.cloudformation.proxy.*;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-
-@ExtendWith(MockitoExtension.class)
 public class UpdateHandlerTest extends TestBase {
-    @Mock
-    private AmazonWebServicesClientProxy proxy;
+    private UpdateHandler handler = new UpdateHandler();
 
-    @Mock
-    private Logger logger;
+    @Test
+    public void handleRequest_canaryStateIsCreating_fails() {
+        configureGetCanaryResponse(CanaryState.CREATING);
 
-    private UpdateHandler handler;
-
-    private ResourceHandlerRequest<ResourceModel> request;
-
-    private ResourceModel model;
-
-    @BeforeEach
-    public void setup() {
-        proxy = mock(AmazonWebServicesClientProxy.class);
-        logger = mock(Logger.class);
-        handler  = new UpdateHandler();
-        request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(buildModel("syn-1.0", null))
-                .clientRequestToken("clientRequestToken")
-                .logicalResourceIdentifier("logicIdentifier")
-                .build();
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, REQUEST, null, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.FAILED);
+        assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.ResourceConflict);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
     }
 
-    private ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing) {
-        final Code codeObjectForTesting = new Code(null,
-                null,
-                null,
-                "var synthetics = require('Synthetics');\n" +
-                        "const log = require('SyntheticsLogger');\n" +
-                        "\n" +
-                        "const pageLoadBlueprint = async function () {\n" +
-                        "\n" +
-                        "    // INSERT URL here\n" +
-                        "    const URL = \"https://amazon.com\";\n" +
-                        "\n" +
-                        "    let page = await synthetics.getPage();\n" +
-                        "    const response = await page.goto(URL, {waitUntil: 'domcontentloaded', timeout: 30000});\n" +
-                        "    //Wait for page to render.\n" +
-                        "    //Increase or decrease wait time based on endpoint being monitored.\n" +
-                        "    await page.waitFor(15000);\n" +
-                        "    await synthetics.takeScreenshot('loaded', 'loaded');\n" +
-                        "    let pageTitle = await page.title();\n" +
-                        "    log.info('Page title: ' + pageTitle);\n" +
-                        "    if (response.status() !== 200) {\n" +
-                        "        throw \"Failed to load page!\";\n" +
-                        "    }\n" +
-                        "};\n" +
-                        "\n" +
-                        "exports.handler = async () => {\n" +
-                        "    return await pageLoadBlueprint();\n" +
-                        "};",
-                "pageLoadBlueprint.handler");
+    @Test
+    public void handleRequest_canaryStateIsUpdating_fails() {
+        configureGetCanaryResponse(CanaryState.UPDATING);
 
-        final Schedule scheduleForTesting = new Schedule();
-        scheduleForTesting.setDurationInSeconds("3600");
-        scheduleForTesting.setExpression("rate(1 min)");
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, REQUEST, null, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.FAILED);
+        assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.ResourceConflict);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+    }
 
-        ArrayList<String> subnetIds = new ArrayList<>();
-        subnetIds.add("subnet-3a473011");
-        subnetIds.add("subnet-123f3159");
+    @Test
+    public void handleRequest_canaryStateIsStarting_returnsInProgress() {
+        configureGetCanaryResponse(CanaryState.STARTING);
 
-        ArrayList<String> securityGroups = new ArrayList<>();
-        securityGroups.add("sg-5582b213");
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, REQUEST, null, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+    }
 
-        final VPCConfig vpcConfig = new VPCConfig();
-        vpcConfig.setSubnetIds(subnetIds);
-        vpcConfig.setSecurityGroupIds(securityGroups);
+    @Test
+    public void handleRequest_canaryStateIsStopping_returnsInProgress() {
+        configureGetCanaryResponse(CanaryState.STOPPING);
 
-        Tag tagUpdate = Tag.builder().key("key2").value("value2").build();
-        List<Tag> listTag = new ArrayList<>();
-        listTag.add(tagUpdate);
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, REQUEST, null, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+    }
 
-        RunConfig runConfig = RunConfig.builder().timeoutInSeconds(600).memoryInMB(960).activeTracing(isActiveTracing).build();
+    @ParameterizedTest
+    @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
+    public void handleRequest_canaryStateAllowsUpdate_updateStarts(CanaryState state) {
+        configureGetCanaryResponse(state);
 
-        model = ResourceModel.builder()
-                .name(String.format("canary_created_from_cloudformation-" + new DateTime().toString()))
-                .artifactS3Location("s3://cloudformation-created-bucket")
-                .code(codeObjectForTesting)
-                .executionRoleArn("arn:aws:test::myaccount")
-                .schedule(scheduleForTesting)
-                .runtimeVersion(runtimeVersion)
-                .startCanaryAfterCreation(true)
-                .vPCConfig(vpcConfig)
-                .tags(listTag)
-                .runConfig(runConfig)
-                .failureRetentionPeriod(31)
-                .successRetentionPeriod(31)
-                .build();
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, REQUEST, null, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModel()).isNotNull();
+        assertThat(response.getCallbackContext().isCanaryUpdateStarted()).isTrue();
+        assertThat(response.getCallbackContext().getInitialCanaryState()).isEqualTo(state);
+    }
 
-        return model;
+    @Test
+    public void handleRequest_canaryNotFound_throws() {
+        configureGetCanaryResponse(ResourceNotFoundException.builder().build());
+
+        assertThatThrownBy(() -> handler.handleRequest(proxy, REQUEST, null, logger))
+            .isInstanceOf(CfnNotFoundException.class);
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsUpdating_returnsInProgress() {
+        configureGetCanaryResponse(CanaryState.UPDATING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy, REQUEST, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsError_fails() {
+        configureGetCanaryResponse(CanaryState.ERROR, ERROR_STATE_REASON);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy, REQUEST, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.FAILED);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+        assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.GeneralServiceException);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CanaryState.class, names = { "READY", "STOPPED" })
+    public void handleRequest_inProgress_canaryStateIsReadyOrStopped_startCanaryAfterCreationIsFalse_returnsSuccess(CanaryState state) {
+        configureGetCanaryResponse(state);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy, REQUEST, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getResourceModel()).isNotNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CanaryState.class, names = { "READY", "STOPPED" })
+    public void handleRequest_inProgress_canaryStateIsReadyOrStopped_startCanaryAfterCreationIsTrue_returnsInProgress(CanaryState state) {
+        configureGetCanaryResponse(state);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy, REQUEST_START_CANARY, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+
+        verify(proxy).injectCredentialsAndInvokeV2(eq(StartCanaryRequest.builder().name(CANARY_NAME).build()), any());
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsStarting_startCanaryAfterCreationIsFalse_returnsSuccess() {
+        configureGetCanaryResponse(CanaryState.STARTING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy, REQUEST, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
+
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getResourceModel()).isNotNull();
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsStarting_startCanaryAfterCreationIsTrue_returnsInProgress() {
+        configureGetCanaryResponse(CanaryState.STARTING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy, REQUEST_START_CANARY, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsRunning_initialStateIsRunning_startCanaryAfterCreationIsTrue_returnsSuccess() {
+        configureGetCanaryResponse(CanaryState.RUNNING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy,
+            REQUEST_START_CANARY,
+            CallbackContext.builder().canaryUpdateStarted(true).initialCanaryState(CanaryState.RUNNING).build(),
+            logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getResourceModel()).isNotNull();
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsRunning_initialStateIsRunning_startCanaryAfterCreationIsFalse_stopsCanary() {
+        configureGetCanaryResponse(CanaryState.RUNNING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy,
+            REQUEST,
+            CallbackContext.builder().canaryUpdateStarted(true).initialCanaryState(CanaryState.RUNNING).build(),
+            logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+
+        verify(proxy).injectCredentialsAndInvokeV2(eq(StopCanaryRequest.builder().name(CANARY_NAME).build()), any());
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsRunning_initialStateIsRunning_startCanaryAfterCreationIsTrue_stateReasonIsNotNull_fails() {
+        configureGetCanaryResponse(CanaryState.RUNNING, ERROR_STATE_REASON);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy,
+            REQUEST_START_CANARY,
+            CallbackContext.builder().canaryUpdateStarted(true).initialCanaryState(CanaryState.RUNNING).build(),
+            logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.FAILED);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
+        assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.GeneralServiceException);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CanaryState.class, names = { "READY", "STOPPED", "ERROR" })
+    public void handleRequest_inProgress_canaryStateIsRunning_initialStateIsNotRunning_returnsSuccess(CanaryState initialState) {
+        configureGetCanaryResponse(CanaryState.RUNNING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy,
+            REQUEST,
+            CallbackContext.builder().canaryUpdateStarted(true).initialCanaryState(initialState).build(),
+            logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getResourceModel()).isNotNull();
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsStopping_returnsInProgress() {
+        configureGetCanaryResponse(CanaryState.STOPPING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+            proxy,
+            REQUEST,
+            CallbackContext.builder().canaryUpdateStarted(true).build(),
+            logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getMessage()).isNotNull();
+        assertThat(response.getResourceModel()).isNotNull();
     }
 
     @Test
@@ -131,12 +240,7 @@ public class UpdateHandlerTest extends TestBase {
                 .build();
 
         final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(true)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
+                .canaryUpdateStarted(true)
                 .build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
@@ -180,14 +284,7 @@ public class UpdateHandlerTest extends TestBase {
                 .tags(tagExisting)
                 .build();
 
-        final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(false)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
+        final CallbackContext callbackContext = CallbackContext.builder().build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
                 .canary(canary)
@@ -201,17 +298,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-nodejs-2.0-beta");
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-
-        final CallbackContext callbackContextUpdated = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
-        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();
@@ -240,14 +326,7 @@ public class UpdateHandlerTest extends TestBase {
                 .tags(tagExisting)
                 .build();
 
-        final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(false)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
+        final CallbackContext callbackContext = CallbackContext.builder().build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
                 .canary(canary)
@@ -261,17 +340,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-1.0");
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-
-        final CallbackContext callbackContextUpdated = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
-        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();
@@ -300,14 +368,7 @@ public class UpdateHandlerTest extends TestBase {
                 .tags(tagExisting)
                 .build();
 
-        final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(false)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
+        final CallbackContext callbackContext = CallbackContext.builder().build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
                 .canary(canary)
@@ -321,17 +382,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-
-        final CallbackContext callbackContextUpdated = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
-        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();
@@ -360,14 +410,7 @@ public class UpdateHandlerTest extends TestBase {
                 .tags(tagExisting)
                 .build();
 
-        final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(false)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
+        final CallbackContext callbackContext = CallbackContext.builder().build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
                 .canary(canary)
@@ -381,17 +424,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-
-        final CallbackContext callbackContextUpdated = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
-        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(true);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
@@ -421,14 +453,7 @@ public class UpdateHandlerTest extends TestBase {
                 .tags(tagExisting)
                 .build();
 
-        final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(false)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
+        final CallbackContext callbackContext = CallbackContext.builder().build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
                 .canary(canary)
@@ -442,17 +467,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-
-        final CallbackContext callbackContextUpdated = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
-        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
@@ -482,14 +496,7 @@ public class UpdateHandlerTest extends TestBase {
                 .tags(tagExisting)
                 .build();
 
-        final CallbackContext callbackContext = CallbackContext.builder()
-                .canaryUpdationStarted(false)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
+        final CallbackContext callbackContext = CallbackContext.builder().build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
                 .canary(canary)
@@ -503,17 +510,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-
-        final CallbackContext callbackContextUpdated = CallbackContext.builder()
-                .canaryUpdationStarted(true)
-                .canaryUpdationStablized(false)
-                .canaryStartStarted(true)
-                .canaryStartStablized(true)
-                .canaryStopStarted(true)
-                .canaryStopStabilized(true)
-                .build();
-        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
@@ -545,14 +541,7 @@ public class UpdateHandlerTest extends TestBase {
             .tags(tagExisting)
             .build();
 
-        final CallbackContext callbackContext = CallbackContext.builder()
-            .canaryUpdationStarted(false)
-            .canaryUpdationStablized(false)
-            .canaryStartStarted(true)
-            .canaryStartStablized(true)
-            .canaryStopStarted(true)
-            .canaryStopStabilized(true)
-            .build();
+        final CallbackContext callbackContext = CallbackContext.builder().build();
 
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
             .canary(canary)
@@ -566,17 +555,6 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response).isNotNull();
         assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-
-        final CallbackContext callbackContextUpdated = CallbackContext.builder()
-            .canaryUpdationStarted(true)
-            .canaryUpdationStablized(false)
-            .canaryStartStarted(true)
-            .canaryStartStablized(true)
-            .canaryStopStarted(true)
-            .canaryStopStabilized(true)
-            .build();
-        assertThat(response.getCallbackContext()).isEqualTo(callbackContextUpdated);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
         assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(true);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();

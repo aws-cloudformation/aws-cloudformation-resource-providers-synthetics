@@ -238,7 +238,8 @@
         },
         "delete": {
             "permissions": [
-                "synthetics:DeleteCanary"
+                "synthetics:DeleteCanary",
+                "synthetics:GetCanary"
             ]
         },
         "list": {

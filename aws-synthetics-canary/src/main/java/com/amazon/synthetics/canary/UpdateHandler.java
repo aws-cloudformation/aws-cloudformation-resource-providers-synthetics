@@ -1,118 +1,154 @@
 package com.amazon.synthetics.canary;
 
+import com.google.common.base.Strings;
 import java.util.Objects;
-import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.*;
-import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
+import software.amazon.cloudformation.Action;
 import software.amazon.cloudformation.exceptions.*;
 import software.amazon.cloudformation.proxy.*;
 
 import java.util.Map;
 
-public class UpdateHandler extends BaseHandler<CallbackContext> {
+public class UpdateHandler extends CanaryActionHandler {
     private static final int CALLBACK_DELAY_SECONDS = 10;
     private static final int MAX_RETRY_TIMES = 10; // 5min * 60 / 30 = 10
     private static final String ADD_TAGS = "ADD_TAGS";
     private static final String REMOVE_TAGS = "REMOVE_TAGS";
 
-    private Logger logger;
-    private AmazonWebServicesClientProxy clientProxy;
-    private ResourceHandlerRequest<ResourceModel> request;
-    private SyntheticsClient syntheticsClient;
-
-
-    @Override
-    public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
-            final AmazonWebServicesClientProxy proxy,
-            final ResourceHandlerRequest<ResourceModel> request,
-            final CallbackContext callbackContext,
-            final Logger logger) {
-
-        this.clientProxy = proxy;
-        this.request = request;
-        this.logger = logger;
-
-        final ResourceModel model = request.getDesiredResourceState();
-        final CallbackContext currentContext = callbackContext == null ?
-                CallbackContext.builder()
-                        .build() :
-                callbackContext;
-        syntheticsClient = ClientBuilder.getClient();
-
-        // This Lambda will continually be re-invoked with the current state of the instance, finally succeeding when state stabilizes.
-        return updateCanaryAndUpdateProgress(model, currentContext, proxy, request, syntheticsClient);
+    public UpdateHandler() {
+        super(Action.UPDATE);
     }
 
-    private ProgressEvent<ResourceModel, CallbackContext> updateCanaryAndUpdateProgress(final ResourceModel model,
-                                                                                        final CallbackContext callbackContext,
-                                                                                        final AmazonWebServicesClientProxy proxy,
-                                                                                        final ResourceHandlerRequest<ResourceModel> request,
-                                                                                        final SyntheticsClient syntheticsClient) {
-        // Update Canary
-        if (!callbackContext.isCanaryUpdationStarted()) {
-            return updateCanary(model, callbackContext, proxy, request, syntheticsClient);
-        }
-
-        //Update creation started. Check for stabilization.
-        if (!callbackContext.isCanaryUpdationStablized()) {
-            return updateCanaryUpdationProgress(model, callbackContext, proxy, request, syntheticsClient);
-        }
-
-        Canary canary = getCanaryRecord(model, proxy, syntheticsClient);
-        CanaryState canaryState = canary.status().state();
-
-        if (model.getStartCanaryAfterCreation()) {
-            if (canaryState != CanaryState.RUNNING) {
-                if (!callbackContext.isCanaryStartStarted()) {
-                    return startCanary(model, callbackContext, proxy, request, syntheticsClient);
-                }
-
-                // Canary has been started. Wait until it stabilizes
-                if (!callbackContext.isCanaryStartStablized()) {
-                    return updateCanaryStartProgress(model, callbackContext, proxy, request, syntheticsClient);
-                }
-            }
-
-            // Canary has been started. Return SUCCESS.
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .resourceModel(model)
-                .status(OperationStatus.SUCCESS)
-                .build();
-        } else {
-            if (canaryState == CanaryState.READY || canaryState == CanaryState.STOPPED) {
+    @Override
+    public ProgressEvent<ResourceModel, CallbackContext> handleRequest() {
+        Canary canary = getCanaryOrThrow();
+        if (!context.isCanaryUpdateStarted()) {
+            if (canary.status().state() == CanaryState.CREATING) {
+                String message = "Canary is in state CREATING and cannot be updated.";
+                log(message);
                 return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .message(message)
                     .resourceModel(model)
-                    .status(OperationStatus.SUCCESS)
+                    .errorCode(HandlerErrorCode.ResourceConflict)
+                    .status(OperationStatus.FAILED)
                     .build();
+            } else if (canary.status().state() == CanaryState.UPDATING) {
+                String message = "Canary is already updating.";
+                log(message);
+                return ProgressEvent.<ResourceModel, CallbackContext>builder()
+                    .message(message)
+                    .resourceModel(model)
+                    .errorCode(HandlerErrorCode.ResourceConflict)
+                    .status(OperationStatus.FAILED)
+                    .build();
+            } else if (canary.status().state() == CanaryState.STARTING) {
+                String message = "Canary is in state STARTING. It must finish starting before it can be updated.";
+                return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "STARTING");
+            } else if (canary.status().state() == CanaryState.STOPPING) {
+                String message = "Canary is in state STOPPING. It must finish stopping before it can be updated.";
+                return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "STOPPING");
+            } else {
+                context.setInitialCanaryState(canary.status().state());
+                context.setCanaryUpdateStarted(true);
+                return updateCanary(canary);
             }
+        }
+
+        if (canary.status().state() == CanaryState.UPDATING) {
+            return waitingForCanaryStateTransition("Update in progress", MAX_RETRY_TIMES, "UPDATING");
+        } else if (canary.status().state() == CanaryState.ERROR) {
+            log(String.format("Canary is in state ERROR. %s", canary.status().stateReason()));
+            return ProgressEvent.failed(
+                model,
+                context,
+                HandlerErrorCode.GeneralServiceException,
+                canary.status().stateReason());
+        } else if (canary.status().state() == CanaryState.READY || canary.status().state() == CanaryState.STOPPED) {
+            return handleCanaryInStateReadyOrStopped(canary);
+        } else if (canary.status().state() == CanaryState.STARTING) {
+            return handleCanaryInStateStarting(canary);
+        } else if (canary.status().state() == CanaryState.RUNNING) {
+            return handleCanaryInStateRunning(canary);
+        } else if (canary.status().state() == CanaryState.STOPPING) {
+            return waitingForCanaryStateTransition("Stopping canary", MAX_RETRY_TIMES, "STOPPING");
         }
 
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .resourceModel(model)
-                .status(OperationStatus.FAILED)
-                .build();
+            .resourceModel(model)
+            .status(OperationStatus.FAILED)
+            .build();
     }
 
-    private ProgressEvent<ResourceModel, CallbackContext> updateCanary(final ResourceModel model,
-                                                                       final CallbackContext callbackContext,
-                                                                       final AmazonWebServicesClientProxy proxy,
-                                                                       final ResourceHandlerRequest<ResourceModel> request,
-                                                                       final SyntheticsClient syntheticsClient) {
-        logger.log("Updating canary...");
-        final GetCanaryRequest getCanaryRequest = GetCanaryRequest.builder()
-                .name(model.getName())
-                .build();
-        final GetCanaryResponse getCanaryResponse;
+    private ProgressEvent<ResourceModel, CallbackContext> handleCanaryInStateReadyOrStopped(Canary canary) {
+        log(String.format("Canary is in state %s.", canary.status().stateAsString()));
 
-        try {
-            getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest,
-                    syntheticsClient::getCanary);
-        } catch (ResourceNotFoundException rfne) {
-            throw new CfnNotFoundException(ResourceModel.TYPE_NAME, model.getPrimaryIdentifier().toString());
+        if (model.getStartCanaryAfterCreation()) {
+            // There is a race condition here. We will get an exception if someone calls
+            // DeleteCanary, StartCanary, or UpdateCanary before we call StartCanary.
+
+            proxy.injectCredentialsAndInvokeV2(
+                StartCanaryRequest.builder()
+                    .name(canary.name())
+                    .build(),
+                syntheticsClient::startCanary);
+
+            return waitingForCanaryStateTransition("Starting canary", MAX_RETRY_TIMES, "READY");
+        } else {
+            return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
+        }
+    }
+
+    private ProgressEvent<ResourceModel, CallbackContext> handleCanaryInStateStarting(Canary canary) {
+        // If the customer calls StartCanary before we handle the canary in READY or
+        // STOPPED state, then we can end up here even when StartCanaryAfterCreation is false.
+
+        if (model.getStartCanaryAfterCreation()) {
+            return waitingForCanaryStateTransition(
+                "Starting canary",
+                "Canary is in state STARTING.",
+                MAX_RETRY_TIMES,
+                "STARTING");
+        } else {
+            log("Canary is in STARTING state even though StartCanaryAfterCreation was false.");
+            return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
+        }
+    }
+
+    private ProgressEvent<ResourceModel, CallbackContext> handleCanaryInStateRunning(Canary canary) {
+        log("Canary is in state RUNNING.");
+
+        if (context.getInitialCanaryState() == CanaryState.RUNNING) {
+            // If the canary was initially in state RUNNING and there was an error
+            // during provisioning, then it will be set to RUNNING again and the message
+            // will be in the StateReason field.
+            if (!Strings.isNullOrEmpty(canary.status().stateReason())) {
+                log(String.format("Update failed: %s", canary.status().stateReason()));
+                return ProgressEvent.failed(
+                    model,
+                    context,
+                    HandlerErrorCode.GeneralServiceException,
+                    canary.status().stateReason());
+            }
+
+            // If the canary was initially in state RUNNING and StartCanaryAfterCreation is
+            // false, we should stop the canary.
+            if (!model.getStartCanaryAfterCreation()) {
+                // There is a race condition here. We will get an exception if someone calls
+                // DeleteCanary, StopCanary, or UpdateCanary before we call StopCanary.
+                proxy.injectCredentialsAndInvokeV2(
+                    StopCanaryRequest.builder()
+                        .name(canary.name())
+                        .build(),
+                    syntheticsClient::stopCanary);
+
+                return waitingForCanaryStateTransition("Stopping canary", MAX_RETRY_TIMES, "RUNNING");
+            }
         }
 
-        Canary canary = getCanaryResponse.canary();
+        return ProgressEvent.defaultSuccessHandler(ModelHelper.constructModel(canary, model));
+    }
 
+    private ProgressEvent<ResourceModel, CallbackContext> updateCanary(Canary canary) {
         String handlerName = canary.code().handler();
         String scheduleExpression = canary.schedule().expression();
         String durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : null;
@@ -125,63 +161,58 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         VpcConfigInput vpcConfigInput = null;
 
         if (!Objects.equals(handlerName, model.getCode().getHandler())) {
-            logger.log("Updating handler");
+            log("Updating handler");
             handlerName = model.getCode().getHandler();
         }
 
         if (!Objects.equals(scheduleExpression, model.getSchedule().getExpression())) {
-            logger.log("Updating scheduleExpression");
+            log("Updating scheduleExpression");
             scheduleExpression = model.getSchedule().getExpression();
         }
 
         if (!Objects.equals(durationInSecs, model.getSchedule().getDurationInSeconds())) {
-            logger.log("Updating durationInSecs");
+            log("Updating durationInSecs");
             durationInSecs = model.getSchedule().getDurationInSeconds();
         }
 
         if (model.getRunConfig() != null) {
             if (!Objects.equals(timeoutInSeconds, model.getRunConfig().getTimeoutInSeconds())) {
-                logger.log("Updating timeoutInSeconds");
+                log("Updating timeoutInSeconds");
                 timeoutInSeconds = model.getRunConfig().getTimeoutInSeconds();
             }
 
             if (model.getRunConfig().getMemoryInMB() != null &&
                 !Objects.equals(memoryInMB, model.getRunConfig().getMemoryInMB())) {
-                logger.log("Updating memory");
+                log("Updating memory");
                 memoryInMB = model.getRunConfig().getMemoryInMB();
             }
             
             if (model.getRunConfig().getActiveTracing() != null && !Objects.equals(activeTracing, model.getRunConfig().getActiveTracing())) {
-                    logger.log("Updating active tracing");
-                    activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
-                }
-        }
-
-        if (model.getVPCConfig() != null) {
-            if (model.getVPCConfig().getSubnetIds() != null &&
-                !model.getVPCConfig().getSubnetIds().isEmpty() &&
-                model.getVPCConfig().getSecurityGroupIds() != null &&
-                !model.getVPCConfig().getSecurityGroupIds().isEmpty()) {
-                logger.log("Updating vpcConfig");
-                vpcConfigInput = VpcConfigInput.builder()
-                    .subnetIds(model.getVPCConfig().getSubnetIds())
-                    .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
-                    .build();
+                log("Updating active tracing");
+                activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
             }
         }
 
+        if (!ModelHelper.isNullOrEmpty(model.getVPCConfig())) {
+            log("Updating vpcConfig");
+            vpcConfigInput = VpcConfigInput.builder()
+                .subnetIds(model.getVPCConfig().getSubnetIds())
+                .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
+                .build();
+        }
+
         if (!Objects.equals(successRetentionPeriodInDays, model.getSuccessRetentionPeriod())) {
-            logger.log("Updating successRetentionPeriodInDays");
+            log("Updating successRetentionPeriodInDays");
             successRetentionPeriodInDays = model.getSuccessRetentionPeriod();
         }
 
         if (!Objects.equals(failureRetentionPeriodInDays, model.getFailureRetentionPeriod())) {
-            logger.log("Updating failureRetentionPeriodInDays");
+            log("Updating failureRetentionPeriodInDays");
             failureRetentionPeriodInDays = model.getFailureRetentionPeriod();
         }
 
         if (!Objects.equals(executionRoleArn, model.getExecutionRoleArn())) {
-            logger.log("Updating executionRoleArn");
+            log("Updating executionRoleArn");
             executionRoleArn = model.getExecutionRoleArn();
         }
 
@@ -238,134 +269,15 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
             }
         }
         catch (final ValidationException e) {
-            throw new CfnInvalidRequestException(e.getMessage());
+            throw new CfnInvalidRequestException(e);
         } catch (final Exception e) {
-            throw new CfnGeneralServiceException(e.getMessage());
+            throw new CfnGeneralServiceException(e);
         }
-        callbackContext.setCanaryUpdationStarted(true);
         return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .callbackContext(callbackContext)
+                .callbackContext(context)
                 .resourceModel(model)
                 .status(OperationStatus.IN_PROGRESS)
                 .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
                 .build();
-    }
-
-    private ProgressEvent<ResourceModel, CallbackContext> updateCanaryUpdationProgress(final ResourceModel model,
-                                                                                       final CallbackContext callbackContext,
-                                                                                       final AmazonWebServicesClientProxy proxy,
-                                                                                       final ResourceHandlerRequest<ResourceModel> request,
-                                                                                       final SyntheticsClient syntheticsClient) {
-        boolean canaryUpdationState = checkUpdateIntermediateStateStabilization(model, proxy, callbackContext, syntheticsClient);
-        callbackContext.incrementRetryTimes();
-
-        if (canaryUpdationState) {
-            callbackContext.setCanaryUpdationStablized(canaryUpdationState);
-        }
-        return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .callbackContext(callbackContext)
-                .resourceModel(model)
-                .status(OperationStatus.IN_PROGRESS)
-                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
-                .build();
-    }
-
-    private boolean checkUpdateIntermediateStateStabilization(final ResourceModel model,
-                                                              final AmazonWebServicesClientProxy proxy,
-                                                              final CallbackContext callbackContext,
-                                                              final SyntheticsClient syntheticsClient) {
-        if (callbackContext.getStabilizationRetryTimes() >= MAX_RETRY_TIMES)
-            throw new CfnNotStabilizedException(ResourceModel.TYPE_NAME, model.getName());
-
-        try {
-            Canary canary = getCanaryRecord(model, proxy, syntheticsClient);
-            if (canary.status().state() != CanaryState.UPDATING) {
-                return true;
-            }
-        } catch (final ResourceNotFoundException e) {
-            return false;
-        }
-        return false;
-    }
-
-    private ProgressEvent<ResourceModel, CallbackContext> startCanary(final ResourceModel model,
-                                                                      final CallbackContext callbackContext,
-                                                                      final AmazonWebServicesClientProxy proxy,
-                                                                      final ResourceHandlerRequest<ResourceModel> request,
-                                                                      final SyntheticsClient syntheticsClient) {
-        callbackContext.setCanaryStartStarted(true);
-        final StartCanaryRequest startCanaryRequest = StartCanaryRequest.builder()
-                .name(model.getName()).build();
-        try {
-            proxy.injectCredentialsAndInvokeV2(startCanaryRequest, syntheticsClient::startCanary);
-        } catch (final InternalServerException e) {
-            throw new CfnGeneralServiceException(ResourceModel.TYPE_NAME + e.getMessage());
-        }
-        return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .callbackContext(callbackContext)
-                .resourceModel(model)
-                .status(OperationStatus.IN_PROGRESS)
-                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
-                .build();
-    }
-
-    private ProgressEvent<ResourceModel, CallbackContext> updateCanaryStartProgress(final ResourceModel model,
-                                                                                    final CallbackContext callbackContext,
-                                                                                    final AmazonWebServicesClientProxy proxy,
-                                                                                    final ResourceHandlerRequest<ResourceModel> request,
-                                                                                    final SyntheticsClient syntheticsClient) {
-        boolean canaryStartingState = checkCanaryStartStabilization(model, proxy, callbackContext, syntheticsClient);
-        callbackContext.setCanaryStartStablized(canaryStartingState);
-        callbackContext.incrementRetryTimes();
-        if (canaryStartingState) {
-            return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                    .resourceModel(model)
-                    .status(OperationStatus.SUCCESS)
-                    .build();
-        }
-        return ProgressEvent.<ResourceModel, CallbackContext>builder()
-                .callbackContext(callbackContext)
-                .resourceModel(model)
-                .status(OperationStatus.IN_PROGRESS)
-                .callbackDelaySeconds(CALLBACK_DELAY_SECONDS)
-                .build();
-    }
-
-    private boolean checkCanaryStartStabilization(final ResourceModel model,
-                                                  final AmazonWebServicesClientProxy proxy,
-                                                  final CallbackContext callbackContext,
-                                                  final SyntheticsClient syntheticsClient) {
-        if (callbackContext.getStabilizationRetryTimes() >= MAX_RETRY_TIMES)
-            throw new CfnNotStabilizedException(ResourceModel.TYPE_NAME, model.getName());
-
-        try {
-            Canary canary = getCanaryRecord(model, proxy, syntheticsClient);
-            if (canary.status().state() == CanaryState.RUNNING) {
-                logger.log("Canary has successfully entered the RUNNING state");
-                return true;
-            }
-        } catch (final ResourceNotFoundException e) {
-            return false;
-        }
-        return false;
-    }
-
-    // Get the canary metadata
-    private Canary getCanaryRecord(final ResourceModel model,
-                                   final AmazonWebServicesClientProxy proxy,
-                                   final SyntheticsClient syntheticsClient) {
-        Canary canary;
-        final GetCanaryRequest getCanaryRequest = GetCanaryRequest.builder()
-                .name(model.getName())
-                .build();
-        final GetCanaryResponse getCanaryResponse;
-        try {
-            getCanaryResponse = proxy.injectCredentialsAndInvokeV2(getCanaryRequest,
-                    syntheticsClient::getCanary);
-            canary = getCanaryResponse.canary();
-        } catch (final ResourceNotFoundException e) {
-            throw new CfnInternalFailureException();
-        }
-        return canary;
     }
 }
