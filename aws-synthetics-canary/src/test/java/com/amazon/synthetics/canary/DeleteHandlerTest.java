@@ -3,13 +3,9 @@ package com.amazon.synthetics.canary;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryState;
-import software.amazon.awssdk.services.synthetics.model.CanaryStatus;
 import software.amazon.awssdk.services.synthetics.model.ConflictException;
 import software.amazon.awssdk.services.synthetics.model.DeleteCanaryRequest;
-import software.amazon.awssdk.services.synthetics.model.GetCanaryRequest;
-import software.amazon.awssdk.services.synthetics.model.GetCanaryResponse;
 import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.synthetics.model.StopCanaryRequest;
 import software.amazon.cloudformation.exceptions.CfnNotFoundException;
@@ -20,7 +16,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -94,13 +89,13 @@ public class DeleteHandlerTest extends TestBase {
 
     @ParameterizedTest
     @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
-    public void handleRequest_canaryStateAllows_invokesDeleteCanary_success(CanaryState state) {
+    public void handleRequest_canaryStateAllows_invokesDeleteCanary_inProgress(CanaryState state) {
         configureGetCanaryResponse(state);
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, null, logger);
 
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any());
     }
 
@@ -129,6 +124,26 @@ public class DeleteHandlerTest extends TestBase {
             .isInstanceOf(CfnResourceConflictException.class);
 
         verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any());
+    }
+
+    @Test
+    public void handleRequest_confirmCanaryDeleted_canaryExists_inProgress() {
+        CallbackContext context = CallbackContext.builder().canaryDeleteStarted(true).build();
+        configureGetCanaryResponse(CanaryState.READY);
+
+        ProgressEvent<ResourceModel, CallbackContext> response =
+            handler.handleRequest(proxy, REQUEST, context, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+    }
+
+    @Test
+    public void handleRequest_confirmCanaryDeleted_canaryNotFound_success() {
+        CallbackContext context = CallbackContext.builder().canaryDeleteStarted(true).build();
+        configureGetCanaryResponse(ResourceNotFoundException.builder().build());
+
+        ProgressEvent<ResourceModel, CallbackContext> response =
+            handler.handleRequest(proxy, REQUEST, context, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 
     @Test

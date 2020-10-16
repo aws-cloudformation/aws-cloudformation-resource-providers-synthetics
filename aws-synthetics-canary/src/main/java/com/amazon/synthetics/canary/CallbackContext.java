@@ -17,6 +17,7 @@ import software.amazon.cloudformation.exceptions.CfnNotStabilizedException;
 public class CallbackContext {
     private boolean canaryCreateStarted;
     private boolean canaryUpdateStarted;
+    private boolean canaryDeleteStarted;
     private String retryKey;
     private int remainingRetryCount;
     private CanaryState initialCanaryState;

@@ -43,7 +43,7 @@ public class CanaryHelper {
                                          SyntheticsClient syntheticsClient,
                                          String canaryName) {
         try {
-            return getCanaryOrThrow(proxy, syntheticsClient, canaryName);
+            return getCanary(proxy, syntheticsClient, canaryName);
         } catch (ResourceNotFoundException e) {
             return null;
         }
@@ -51,20 +51,26 @@ public class CanaryHelper {
     public static Canary getCanaryOrThrow(AmazonWebServicesClientProxy proxy,
                                           SyntheticsClient syntheticsClient,
                                           ResourceModel model) {
-        return getCanaryOrThrow(proxy, syntheticsClient, model.getPrimaryIdentifier().getString(ResourceModel.IDENTIFIER_KEY_NAME));
+        return getCanaryOrThrow(proxy, syntheticsClient, model.getName());
     }
     public static Canary getCanaryOrThrow(AmazonWebServicesClientProxy proxy,
                                           SyntheticsClient syntheticsClient,
                                           String canaryName) {
         try {
-            GetCanaryResponse response = proxy.injectCredentialsAndInvokeV2(
-                GetCanaryRequest.builder()
-                    .name(canaryName)
-                    .build(),
-                syntheticsClient::getCanary);
-            return response.canary();
+            return getCanary(proxy, syntheticsClient, canaryName);
         } catch (ResourceNotFoundException e) {
             throw new CfnNotFoundException(ResourceModel.TYPE_NAME, canaryName, e);
         }
+    }
+
+    private static Canary getCanary(AmazonWebServicesClientProxy proxy,
+                                    SyntheticsClient syntheticsClient,
+                                    String canaryName) {
+        GetCanaryResponse response = proxy.injectCredentialsAndInvokeV2(
+            GetCanaryRequest.builder()
+                .name(canaryName)
+                .build(),
+            syntheticsClient::getCanary);
+        return response.canary();
     }
 }

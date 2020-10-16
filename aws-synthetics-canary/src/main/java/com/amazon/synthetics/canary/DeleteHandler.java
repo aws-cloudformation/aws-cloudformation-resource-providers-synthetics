@@ -14,6 +14,10 @@ public class DeleteHandler extends CanaryActionHandler {
 
     @Override
     protected ProgressEvent<ResourceModel, CallbackContext> handleRequest() {
+        if (context.isCanaryDeleteStarted()) {
+            return confirmCanaryDeleted();
+        }
+
         Canary canary = getCanaryOrThrow();
 
         if (canary.status().state() == CanaryState.CREATING) {
@@ -67,10 +71,7 @@ public class DeleteHandler extends CanaryActionHandler {
                 syntheticsClient::deleteCanary);
         } catch (ResourceNotFoundException e) {
             // Handle race condition where an external process calls DeleteCanary before we do.
-            if (CanaryHelper.getCanaryOrNull(proxy, syntheticsClient, canary.name()) == null) {
-                // Success
-                return ProgressEvent.defaultSuccessHandler(null);
-            }
+            return ProgressEvent.defaultSuccessHandler(null);
         } catch (ConflictException e) {
             // Handle race condition where an external process is mutating the canary while we
             // are trying to delete it.
@@ -81,7 +82,17 @@ public class DeleteHandler extends CanaryActionHandler {
                 e);
         }
 
+        context.setCanaryDeleteStarted(true);
         log("Deleted canary.");
-        return ProgressEvent.defaultSuccessHandler(null);
+        return confirmCanaryDeleted();
+    }
+
+    private ProgressEvent<ResourceModel, CallbackContext> confirmCanaryDeleted() {
+        if (getCanaryOrNull() != null) {
+            String message = "Confirming that canary was deleted.";
+            return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "DELETING");
+        } else {
+            return ProgressEvent.defaultSuccessHandler(null);
+        }
     }
 }
