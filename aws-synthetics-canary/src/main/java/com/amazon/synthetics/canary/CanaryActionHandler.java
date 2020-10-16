@@ -52,6 +52,9 @@ public abstract class CanaryActionHandler extends BaseHandler<CallbackContext> {
     protected Canary getCanaryOrThrow() {
         return CanaryHelper.getCanaryOrThrow(proxy, syntheticsClient, model);
     }
+    protected Canary getCanaryOrNull() {
+        return CanaryHelper.getCanaryOrNull(proxy, syntheticsClient, model.getName());
+    }
 
     protected void log(String message) {
         logger.log(message);
