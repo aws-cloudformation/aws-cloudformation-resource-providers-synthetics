@@ -21,10 +21,12 @@ public class TestBase {
 
     protected static final ResourceHandlerRequest<ResourceModel> REQUEST = ResourceHandlerRequest.<ResourceModel>builder()
         .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false))
+        .awsPartition("aws")
         .region("us-west-2")
         .build();
     protected static final ResourceHandlerRequest<ResourceModel> REQUEST_START_CANARY = ResourceHandlerRequest.<ResourceModel>builder()
         .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, true))
+        .awsPartition("aws")
         .region("us-west-2")
         .build();
 
