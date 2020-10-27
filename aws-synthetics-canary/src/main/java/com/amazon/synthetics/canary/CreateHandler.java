@@ -17,7 +17,7 @@ import software.amazon.cloudformation.proxy.*;
 
 public class CreateHandler extends CanaryActionHandler {
     private static final int DEFAULT_CALLBACK_DELAY_SECONDS = 10;
-    private static final int MAX_RETRY_TIMES = 30;
+    private static final int MAX_RETRY_TIMES = 120;
     private static final int DEFAULT_MEMORY_IN_MB = 960;
 
     public CreateHandler() {
