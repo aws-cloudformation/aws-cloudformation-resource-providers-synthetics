@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class UpdateHandler extends CanaryActionHandler {
     private static final int CALLBACK_DELAY_SECONDS = 10;
-    private static final int MAX_RETRY_TIMES = 10; // 5min * 60 / 30 = 10
+    private static final int MAX_RETRY_TIMES = 120;
     private static final String ADD_TAGS = "ADD_TAGS";
     private static final String REMOVE_TAGS = "REMOVE_TAGS";
 
