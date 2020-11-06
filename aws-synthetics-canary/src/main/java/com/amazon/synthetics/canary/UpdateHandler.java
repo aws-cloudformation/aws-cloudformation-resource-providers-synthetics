@@ -154,6 +154,7 @@ public class UpdateHandler extends CanaryActionHandler {
         String durationInSecs = canary.schedule().durationInSeconds()!= null ? canary.schedule().durationInSeconds().toString() : null;
         Integer timeoutInSeconds = canary.runConfig() != null ? canary.runConfig().timeoutInSeconds() : null;
         Boolean activeTracing = canary.runConfig() != null && canary.runConfig().activeTracing() != null ? canary.runConfig().activeTracing() : false;
+        Map<String, String> environmentVariables = null;
         Integer memoryInMB = canary.runConfig() != null ? canary.runConfig().memoryInMB() : null;
         Integer successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
         Integer failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
@@ -190,6 +191,12 @@ public class UpdateHandler extends CanaryActionHandler {
             if (model.getRunConfig().getActiveTracing() != null && !Objects.equals(activeTracing, model.getRunConfig().getActiveTracing())) {
                 log("Updating active tracing");
                 activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
+            }
+
+            //Since we cannot get environment variables in the get call, as far as the value is present in the request, we replace
+            if(model.getRunConfig().getEnvironmentVariables() != null) {
+                log("Replacing environment variables");
+                environmentVariables = model.getRunConfig().getEnvironmentVariables();
             }
         }
 
@@ -229,10 +236,11 @@ public class UpdateHandler extends CanaryActionHandler {
                 .durationInSeconds(durationInSecs != null ? Long.valueOf(durationInSecs) : null).build();
 
         final CanaryRunConfigInput canaryRunConfigInput = CanaryRunConfigInput.builder()
-                .timeoutInSeconds(timeoutInSeconds)
-                .memoryInMB(memoryInMB)
-                .activeTracing(activeTracing)
-                .build();
+            .timeoutInSeconds(timeoutInSeconds)
+            .memoryInMB(memoryInMB)
+            .activeTracing(activeTracing)
+            .environmentVariables(environmentVariables)
+            .build();
 
         final UpdateCanaryRequest updateCanaryRequest = UpdateCanaryRequest.builder()
                 .name(model.getName())

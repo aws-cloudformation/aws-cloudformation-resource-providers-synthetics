@@ -117,11 +117,14 @@ public class CreateHandler extends CanaryActionHandler {
                     model.getRunConfig().getMemoryInMB() : DEFAULT_MEMORY_IN_MB;
 
 
+
+
             canaryRunConfigInput = CanaryRunConfigInput.builder()
-                    .timeoutInSeconds(model.getRunConfig().getTimeoutInSeconds())
-                    .memoryInMB(memoryInMb)
-                    .activeTracing(Boolean.TRUE.equals(model.getRunConfig().getActiveTracing()))
-                    .build();
+                .timeoutInSeconds(model.getRunConfig().getTimeoutInSeconds())
+                .memoryInMB(memoryInMb)
+                .activeTracing(Boolean.TRUE.equals(model.getRunConfig().getActiveTracing()))
+                .environmentVariables(model.getRunConfig().getEnvironmentVariables())
+                .build();
         }
 
         // VPC Config optional

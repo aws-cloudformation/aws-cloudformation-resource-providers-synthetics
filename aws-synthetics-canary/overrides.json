@@ -17,6 +17,7 @@
     "/RunConfig/TimeoutInSeconds": 60,
     "/RunConfig/MemoryInMB": null,
     "/RunConfig/ActiveTracing": null,
+    "/RunConfig/EnvironmentVariables": null,
     "/VpcConfig": null,
     "/Tags": [
       {

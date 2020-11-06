@@ -177,6 +177,28 @@
                 "ActiveTracing" : {
                     "description": "Enable active tracing if set to true",
                     "type": "boolean"
+                },
+                "EnvironmentVariables" : {
+                    "description": "Provide environment variables in the form of a map (String, String)",
+                    "type": "object",
+                    "properties": {
+                        "Key": {
+                            "type": "string",
+                            "description": "The key for the environment variable",
+                            "minLength": 1,
+                            "maxLength": 128
+                        },
+                        "Value": {
+                            "type": "string",
+                            "description": "The value for the environment variable.",
+                            "minLength": 0,
+                            "maxLength": 256
+                        }
+                    },
+                    "required": [
+                        "Value",
+                        "Key"
+                    ]
                 }
             },
             "required": [
