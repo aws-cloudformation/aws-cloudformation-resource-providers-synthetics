@@ -185,14 +185,12 @@
                         "Key": {
                             "type": "string",
                             "description": "The key for the environment variable",
-                            "minLength": 1,
-                            "maxLength": 128
+                            "minLength": 1
                         },
                         "Value": {
                             "type": "string",
                             "description": "The value for the environment variable.",
-                            "minLength": 0,
-                            "maxLength": 256
+                            "minLength": 0
                         }
                     },
                     "required": [
