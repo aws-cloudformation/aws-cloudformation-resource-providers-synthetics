@@ -567,11 +567,13 @@ public class UpdateHandlerTest extends TestBase {
     @Test
     public void handleRequest_updateEnvironmentVariablesFromNullToPresent(){
         ResourceModel model = buildModel();
+        Map<String, String> environmentVariablesMap = new HashMap<>();
+        environmentVariablesMap.put("env_key", "env_val");
         RunConfig runConfig = new RunConfig();
         runConfig.setTimeoutInSeconds(60);
         runConfig.setMemoryInMB(1024);
         runConfig.setActiveTracing(false);
-        runConfig.setEnvironmentVariables(new SingletonMap("env_key", "env_val"));
+        runConfig.setEnvironmentVariables(environmentVariablesMap);
         model.setRunConfig(runConfig);
 
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
@@ -639,7 +641,7 @@ public class UpdateHandlerTest extends TestBase {
             .status(CanaryStatus.builder()
                 .state("RUNNING")
                 .build())
-            .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(true).environmentVariables(new SingletonMap("env_key", "env_val")).build())
+            .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(true).build())
             .schedule(canaryScheduleOutputWithNullDurationForTesting())
             .runtimeVersion("syn-nodejs-2.0-beta")
             .tags(tagExisting)

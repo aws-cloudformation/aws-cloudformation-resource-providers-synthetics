@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.proxy.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -415,11 +418,13 @@ public class CreateHandlerTest extends TestBase {
     @Test
     public void handleRequest_createCanary_withEnvironmentVariables() {
         ResourceModel model = buildModel();
+        Map<String, String> environmentVariablesMap = new HashMap<>();
+        environmentVariablesMap.put("env_key", "env_val");
         RunConfig runConfig = new RunConfig();
         runConfig.setTimeoutInSeconds(60);
         runConfig.setMemoryInMB(1024);
         runConfig.setActiveTracing(false);
-        runConfig.setEnvironmentVariables(new SingletonMap("env_key", "env_val"));
+        runConfig.setEnvironmentVariables(environmentVariablesMap);
         model.setRunConfig(runConfig);
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
             .desiredResourceState(model)
