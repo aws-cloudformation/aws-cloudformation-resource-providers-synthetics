@@ -177,6 +177,15 @@
                 "ActiveTracing" : {
                     "description": "Enable active tracing if set to true",
                     "type": "boolean"
+                },
+                "EnvironmentVariables" : {
+                    "type" : "object",
+                    "description" : "Environment variable key-value pairs.",
+                    "patternProperties" : {
+                        "[a-zA-Z][a-zA-Z0-9_]+" : {
+                            "type" : "string"
+                        }
+                    }
                 }
             },
             "required": [

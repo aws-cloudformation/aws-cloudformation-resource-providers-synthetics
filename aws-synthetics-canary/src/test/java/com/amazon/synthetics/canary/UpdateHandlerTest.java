@@ -1,5 +1,6 @@
 package com.amazon.synthetics.canary;
 
+import org.apache.commons.collections.map.SingletonMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -556,6 +557,111 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(true);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+
+    @Test
+    public void handleRequest_updateEnvironmentVariablesFromNullToPresent(){
+        ResourceModel model = buildModel();
+        Map<String, String> environmentVariablesMap = new HashMap<>();
+        environmentVariablesMap.put("env_key", "env_val");
+        RunConfig runConfig = new RunConfig();
+        runConfig.setTimeoutInSeconds(60);
+        runConfig.setMemoryInMB(1024);
+        runConfig.setActiveTracing(false);
+        runConfig.setEnvironmentVariables(environmentVariablesMap);
+        model.setRunConfig(runConfig);
+
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+            .desiredResourceState(model)
+            .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+            .name("canarytestname")
+            .executionRoleArn("test execution arn")
+            .code(codeOutputObjectForTesting())
+            .status(CanaryStatus.builder()
+                .state("RUNNING")
+                .build())
+            .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(true).build())
+            .schedule(canaryScheduleOutputWithNullDurationForTesting())
+            .runtimeVersion("syn-nodejs-2.0-beta")
+            .tags(tagExisting)
+            .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+            .canary(canary)
+            .build();
+
+        doReturn(getCanaryResponse)
+            .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
+    public void handleRequest_updateEnvironmentVariablesFromPresentToEmpty(){
+        ResourceModel model = buildModel();
+        RunConfig runConfig = new RunConfig();
+        runConfig.setTimeoutInSeconds(60);
+        runConfig.setMemoryInMB(1024);
+        runConfig.setActiveTracing(false);
+        runConfig.setEnvironmentVariables(new HashMap<>());
+        model.setRunConfig(runConfig);
+
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+            .desiredResourceState(model)
+            .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+            .name("canarytestname")
+            .executionRoleArn("test execution arn")
+            .code(codeOutputObjectForTesting())
+            .status(CanaryStatus.builder()
+                .state("RUNNING")
+                .build())
+            .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(true).build())
+            .schedule(canaryScheduleOutputWithNullDurationForTesting())
+            .runtimeVersion("syn-nodejs-2.0-beta")
+            .tags(tagExisting)
+            .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+            .canary(canary)
+            .build();
+
+        doReturn(getCanaryResponse)
+            .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
         assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();
