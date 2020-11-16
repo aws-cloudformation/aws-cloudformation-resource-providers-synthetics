@@ -116,9 +116,6 @@ public class CreateHandler extends CanaryActionHandler {
             memoryInMb = model.getRunConfig().getMemoryInMB() != null ?
                     model.getRunConfig().getMemoryInMB() : DEFAULT_MEMORY_IN_MB;
 
-
-
-
             canaryRunConfigInput = CanaryRunConfigInput.builder()
                 .timeoutInSeconds(model.getRunConfig().getTimeoutInSeconds())
                 .memoryInMB(memoryInMb)

@@ -194,7 +194,7 @@ public class UpdateHandler extends CanaryActionHandler {
             }
 
             //Since we cannot get environment variables in the get call, as far as the value is present in the request, we replace
-            if(model.getRunConfig().getEnvironmentVariables() != null) {
+            if (model.getRunConfig().getEnvironmentVariables() != null) {
                 log("Replacing environment variables");
                 environmentVariables = model.getRunConfig().getEnvironmentVariables();
             }
