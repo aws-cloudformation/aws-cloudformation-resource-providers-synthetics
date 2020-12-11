@@ -99,18 +99,19 @@
                     "type": "string"
                 }
             },
+            "required": [
+              "Handler"
+            ],
             "oneOf":[
                 {
                     "required":[
                         "S3Bucket",
-                        "S3Key",
-                        "Handler"
+                        "S3Key"
                     ]
                 },
                 {
                     "required":[
-                        "Script",
-                        "Handler"
+                        "Script"
                     ]
                 }
             ]
