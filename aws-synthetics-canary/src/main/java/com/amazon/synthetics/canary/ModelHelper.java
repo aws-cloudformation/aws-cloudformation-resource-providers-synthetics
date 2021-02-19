@@ -20,7 +20,9 @@ import java.util.zip.ZipOutputStream;
 
 public class ModelHelper {
     private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
+    private static final String PYTHON_DIR = "/python/";
     private static final String JS_SUFFIX = ".js";
+    private static final String PY_SUFFIX = ".py";
     private static final String ADD_TAGS = "ADD_TAGS";
     private static final String REMOVE_TAGS = "REMOVE_TAGS";
 
@@ -87,15 +89,33 @@ public class ModelHelper {
                 .vpcId(vpcConfigOutput.vpcId()).build();
     }
 
-    public static SdkBytes compressRawScript(Code code) {
+    public static SdkBytes compressRawScript(ResourceModel model) {
         // Handler name is in the format <function_name>.handler.
         // Need to strip out the .handler suffix
 
-        String functionName = code.getHandler().split("\\.")[0];
+        String functionName = model.getCode().getHandler().split("\\.")[0];
+        String runtimeLanguage = getRuntimeLanguage(model.getRuntimeVersion());
+        String functionNameWithType = "";
+        String zipOutputFilePath = "";
 
-        String jsFunctionName = functionName + JS_SUFFIX;
-        String zipOutputFilePath = NODE_MODULES_DIR + jsFunctionName;
-        String script = code.getScript();
+        /**
+         Runtime is Node
+         **/
+        if ( runtimeLanguage.equalsIgnoreCase("nodejs")) {
+            functionNameWithType = functionName + JS_SUFFIX;
+            zipOutputFilePath = NODE_MODULES_DIR + functionNameWithType;
+            System.out.println("zipOutputFilePath: " + zipOutputFilePath);
+        }
+
+        /**
+         Runtime is Python
+         **/
+        if ( runtimeLanguage.equalsIgnoreCase("python")) {
+            functionNameWithType = functionName + PY_SUFFIX;
+            zipOutputFilePath = PYTHON_DIR + functionNameWithType;
+        }
+
+        String script = model.getCode().getScript();
 
         ByteArrayOutputStream byteArrayOutputStream = null;
         InputStream inputStream = null;
@@ -212,6 +232,18 @@ public class ModelHelper {
             || vpcConfig.getSubnetIds().isEmpty()
             || vpcConfig.getSecurityGroupIds() == null
             || vpcConfig.getSecurityGroupIds().isEmpty();
+    }
+
+    private static String getRuntimeLanguage(String runtimeVersion){
+        String language="";
+        switch (runtimeVersion) {
+            case "syn-python-selenium-1.0":
+                language = "python";
+                break;
+            default:
+                language = "nodejs";
+        }
+        return language;
     }
 }
 
