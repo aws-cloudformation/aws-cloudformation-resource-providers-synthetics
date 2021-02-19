@@ -20,12 +20,12 @@ public class TestBase {
     protected static final String ERROR_STATE_REASON = "Failure message";
 
     protected static final ResourceHandlerRequest<ResourceModel> REQUEST = ResourceHandlerRequest.<ResourceModel>builder()
-        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false))
+        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false, true))
         .awsPartition("aws")
         .region("us-west-2")
         .build();
     protected static final ResourceHandlerRequest<ResourceModel> REQUEST_START_CANARY = ResourceHandlerRequest.<ResourceModel>builder()
-        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, true))
+        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, true, true))
         .awsPartition("aws")
         .region("us-west-2")
         .build();
@@ -196,12 +196,17 @@ public class TestBase {
     }
 
     protected static ResourceModel buildModel() {
-        return buildModel("syn-1.0", null, true);
+        return buildModel("syn-1.0", null, true, true);
     }
+
+    protected static ResourceModel buildModel(boolean useOptionalValues) {
+        return buildModel("syn-1.0", null, true, false);
+    }
+
     protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing) {
-        return buildModel(runtimeVersion, isActiveTracing, true);
+        return buildModel(runtimeVersion, isActiveTracing, true, true);
     }
-    protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing, Boolean startCanaryAfterCreation) {
+    protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing, Boolean startCanaryAfterCreation, boolean useOptionalValues) {
         final Code codeObjectForTesting = new Code(null,
             null,
             null,
@@ -243,14 +248,34 @@ public class TestBase {
         securityGroups.add("sg-5582b213");
 
         final VPCConfig vpcConfig = new VPCConfig();
-        vpcConfig.setSubnetIds(subnetIds);
-        vpcConfig.setSecurityGroupIds(securityGroups);
-
-        Tag tagUpdate = Tag.builder().key("key2").value("value2").build();
+        Tag tagUpdate;
+        RunConfig runConfig;
         List<Tag> listTag = new ArrayList<>();
-        listTag.add(tagUpdate);
 
-        RunConfig runConfig = RunConfig.builder().timeoutInSeconds(600).memoryInMB(960).activeTracing(isActiveTracing).build();
+        if (useOptionalValues) {
+            vpcConfig.setSubnetIds(subnetIds);
+            vpcConfig.setSecurityGroupIds(securityGroups);
+
+            tagUpdate = Tag.builder().key("key2").value("value2").build();
+            listTag.add(tagUpdate);
+
+            runConfig = RunConfig.builder().timeoutInSeconds(600).memoryInMB(960).activeTracing(isActiveTracing).build();
+
+            return ResourceModel.builder()
+                    .name(CANARY_NAME)
+                    .artifactS3Location("s3://cloudformation-created-bucket")
+                    .code(codeObjectForTesting)
+                    .executionRoleArn("arn:aws:test::myaccount")
+                    .schedule(scheduleForTesting)
+                    .runtimeVersion(runtimeVersion)
+                    .startCanaryAfterCreation(startCanaryAfterCreation)
+                    .vPCConfig(vpcConfig)
+                    .tags(listTag)
+                    .runConfig(runConfig)
+                    .failureRetentionPeriod(31)
+                    .successRetentionPeriod(31)
+                    .build();
+        }
 
         return ResourceModel.builder()
             .name(CANARY_NAME)
@@ -260,11 +285,6 @@ public class TestBase {
             .schedule(scheduleForTesting)
             .runtimeVersion(runtimeVersion)
             .startCanaryAfterCreation(startCanaryAfterCreation)
-            .vPCConfig(vpcConfig)
-            .tags(listTag)
-            .runConfig(runConfig)
-            .failureRetentionPeriod(31)
-            .successRetentionPeriod(31)
             .build();
     }
 }

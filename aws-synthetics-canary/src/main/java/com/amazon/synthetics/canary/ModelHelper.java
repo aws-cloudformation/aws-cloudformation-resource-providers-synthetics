@@ -234,19 +234,15 @@ public class ModelHelper {
             || vpcConfig.getSecurityGroupIds().isEmpty();
     }
 
-    private static String getRuntimeLanguage(String runtimeVersion){
-        String language="";
-        switch (runtimeVersion) {
-            case "syn-python-selenium-1.0":
-                language = "python";
-                break;
-            default:
-                language = "nodejs";
+    private static String getRuntimeLanguage(String runtimeVersion) {
+        // python runtime
+        if (runtimeVersion.matches("^syn-python-*")) {
+            return "python";
         }
-        return language;
+        // default
+        return "nodejs";
     }
 }
-
 
 
 
