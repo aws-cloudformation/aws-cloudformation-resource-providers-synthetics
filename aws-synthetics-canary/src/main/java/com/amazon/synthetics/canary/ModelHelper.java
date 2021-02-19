@@ -15,16 +15,23 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public class ModelHelper {
     private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
-    private static final String PYTHON_DIR = "/python/";
     private static final String JS_SUFFIX = ".js";
-    private static final String PY_SUFFIX = ".py";
+
     private static final String ADD_TAGS = "ADD_TAGS";
     private static final String REMOVE_TAGS = "REMOVE_TAGS";
+
+    // Python Runtime
+    private static final String PYTHON_DIR = "/python/";
+    private static final String PY_SUFFIX = ".py";
+    private static final String PYTHON_PATTERN = "^syn-python-*";
+    private static final Pattern python_pattern = Pattern.compile(PYTHON_PATTERN);
 
     public static ResourceModel constructModel(Canary canary, ResourceModel model) {
         Map<String, String> tags = canary.tags();
@@ -235,8 +242,9 @@ public class ModelHelper {
     }
 
     private static String getRuntimeLanguage(String runtimeVersion) {
+        Matcher python_matcher = python_pattern.matcher(runtimeVersion);
         // python runtime
-        if (runtimeVersion.matches("^syn-python-*")) {
+        if(python_matcher.matches()) {
             return "python";
         }
         // default
