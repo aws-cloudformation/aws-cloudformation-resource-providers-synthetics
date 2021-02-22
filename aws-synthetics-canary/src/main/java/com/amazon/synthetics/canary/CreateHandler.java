@@ -98,7 +98,7 @@ public class CreateHandler extends CanaryActionHandler {
                 .s3Bucket(model.getCode().getS3Bucket())
                 .s3Key(model.getCode().getS3Key())
                 .s3Version(model.getCode().getS3ObjectVersion())
-                .zipFile(model.getCode().getScript() != null ? ModelHelper.compressRawScript(model.getCode()) : null)
+                .zipFile(model.getCode().getScript() != null ? ModelHelper.compressRawScript(model) : null)
                 .build();
 
         Long durationInSeconds = !Strings.isNullOrEmpty(model.getSchedule().getDurationInSeconds()) ?

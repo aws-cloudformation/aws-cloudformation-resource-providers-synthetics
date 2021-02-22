@@ -118,6 +118,7 @@
         },
         "Tag": {
             "description": "A key-value pair to associate with a resource.",
+            "additionalProperties" : false,
             "type": "object",
             "properties": {
                 "Key": {
@@ -181,6 +182,7 @@
                 },
                 "EnvironmentVariables" : {
                     "type" : "object",
+                    "additionalProperties": false,
                     "description" : "Environment variable key-value pairs.",
                     "patternProperties" : {
                         "[a-zA-Z][a-zA-Z0-9_]+" : {
@@ -188,10 +190,7 @@
                         }
                     }
                 }
-            },
-            "required": [
-                "TimeoutInSeconds"
-            ]
+            }
         }
     },
     "required": [

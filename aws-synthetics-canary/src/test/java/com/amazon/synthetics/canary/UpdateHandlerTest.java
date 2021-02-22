@@ -306,6 +306,48 @@ public class UpdateHandlerTest extends TestBase {
     }
 
     @Test
+    public void handleRequest_updateWithRemovedTimeout(){
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(buildModel("syn-nodejs-2.0-beta", null, true, false))
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).build())
+                .schedule(canaryScheduleOutputForTesting())
+                .runtimeVersion("syn-1.0")
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getRuntimeVersion()).isEqualTo("syn-nodejs-2.0-beta");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
     public void handleRequest_updateRuntimeDownVersion(){
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
                 .desiredResourceState(buildModel("syn-1.0", null))
