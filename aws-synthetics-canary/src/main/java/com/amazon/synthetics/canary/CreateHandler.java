@@ -150,7 +150,11 @@ public class CreateHandler extends CanaryActionHandler {
         try {
             proxy.injectCredentialsAndInvokeV2(createCanaryRequest, syntheticsClient::createCanary);
         } catch (final ValidationException e) {
-            throw new CfnInvalidRequestException(e.getMessage());
+            if ( e.getMessage().contains("Canary name already exists") ) {
+                throw new CfnAlreadyExistsException(ResourceModel.TYPE_NAME, e.getMessage(), e);
+            } else {
+                throw new CfnInvalidRequestException(e.getMessage());
+            }
         } catch (final Exception e) {
             throw new CfnGeneralServiceException(e.getMessage());
         }
