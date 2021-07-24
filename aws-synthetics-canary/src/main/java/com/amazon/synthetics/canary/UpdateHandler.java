@@ -160,6 +160,7 @@ public class UpdateHandler extends CanaryActionHandler {
         Integer failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
         String executionRoleArn = canary.executionRoleArn();
         VpcConfigInput vpcConfigInput = null;
+        VisualReferenceInput visualReferenceInput = null;
 
         if (!Objects.equals(handlerName, model.getCode().getHandler())) {
             log("Updating handler");
@@ -223,6 +224,11 @@ public class UpdateHandler extends CanaryActionHandler {
             executionRoleArn = model.getExecutionRoleArn();
         }
 
+        if (!ModelHelper.visualReferenceNeedsUpdate(canary.visualReference(), model.getVisualReference())) {
+            log("Updating VisualReference");
+            visualReferenceInput = ModelHelper.getVisualReferenceInput(model.getVisualReference());
+        }
+
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
                 .handler(handlerName)
                 .s3Bucket(model.getCode().getS3Bucket())
@@ -252,6 +258,7 @@ public class UpdateHandler extends CanaryActionHandler {
                 .successRetentionPeriodInDays(successRetentionPeriodInDays)
                 .failureRetentionPeriodInDays(failureRetentionPeriodInDays)
                 .vpcConfig(vpcConfigInput)
+                .visualReference(visualReferenceInput)
                 .build();
 
         try {

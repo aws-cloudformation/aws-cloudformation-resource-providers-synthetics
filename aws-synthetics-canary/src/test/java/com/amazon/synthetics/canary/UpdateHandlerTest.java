@@ -8,7 +8,9 @@ import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.exceptions.CfnNotFoundException;
 import software.amazon.cloudformation.proxy.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -709,5 +711,176 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response.getMessage()).isNull();
         assertThat(response.getErrorCode()).isNull();
     }
+
+
+    @Test
+    public void handleRequest_updateVisualReferenceFromNullToValid(){
+        ResourceModel model = buildModel();
+        RunConfig runConfig = new RunConfig();
+        runConfig.setTimeoutInSeconds(60);
+        runConfig.setMemoryInMB(1024);
+        runConfig.setActiveTracing(false);
+        model.setRunConfig(runConfig);
+        VisualReference visualReference = new VisualReference();
+        BaseScreenshot baseScreenshot = new BaseScreenshot();
+        List<BaseScreenshot> baseScreenshotList = new ArrayList<>();
+        baseScreenshot.setScreenshotName("Test-base.png");
+        baseScreenshotList.add(baseScreenshot);
+        visualReference.setBaseScreenshots(baseScreenshotList);
+        visualReference.setBaseCanaryRunId("nextrun");
+        model.setVisualReference(visualReference);
+
+        VisualReferenceOutput visualReferenceExisting = null;
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(true).build())
+                .schedule(canaryScheduleOutputWithNullDurationForTesting())
+                .runtimeVersion("syn-nodejs-3.2")
+                .visualReference(visualReferenceExisting)
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+        assertThat(response.getResourceModel().getVisualReference()).isNotNull();
+    }
+
+
+    @Test
+    public void handleRequest_updateVisualReferenceToNull(){
+        ResourceModel model = buildModel();
+        RunConfig runConfig = new RunConfig();
+        runConfig.setTimeoutInSeconds(60);
+        runConfig.setMemoryInMB(1024);
+        runConfig.setActiveTracing(false);
+        model.setRunConfig(runConfig);
+        VisualReference visualReference = null;
+        model.setVisualReference(visualReference);
+        VisualReferenceOutput visualReferenceExisting = null;
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(true).build())
+                .schedule(canaryScheduleOutputWithNullDurationForTesting())
+                .runtimeVersion("syn-nodejs-3.2")
+                .visualReference(visualReferenceExisting)
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+        assertThat(response.getResourceModel().getVisualReference()).isNull();
+    }
+
+    @Test
+    public void handleRequest_updateVisualReferenceBaseScreenshotsToNull(){
+        ResourceModel model = buildModel();
+        RunConfig runConfig = new RunConfig();
+        runConfig.setTimeoutInSeconds(60);
+        runConfig.setMemoryInMB(1024);
+        runConfig.setActiveTracing(false);
+        model.setRunConfig(runConfig);
+
+        VisualReference visualReference = new VisualReference();
+        BaseScreenshot baseScreenshot = new BaseScreenshot();
+        List<BaseScreenshot> baseScreenshotList = null;
+        visualReference.setBaseScreenshots(baseScreenshotList);
+        visualReference.setBaseCanaryRunId("nextrun");
+        model.setVisualReference(visualReference);
+
+        model.setVisualReference(visualReference);
+        VisualReferenceOutput visualReferenceExisting = null;
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(true).build())
+                .schedule(canaryScheduleOutputWithNullDurationForTesting())
+                .runtimeVersion("syn-nodejs-3.2")
+                .visualReference(visualReferenceExisting)
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+        assertThat(response.getResourceModel().getVisualReference()).isNotNull();
+        assertThat(response.getResourceModel().getVisualReference().getBaseScreenshots()).isNull();
+    }
+
 }
 
