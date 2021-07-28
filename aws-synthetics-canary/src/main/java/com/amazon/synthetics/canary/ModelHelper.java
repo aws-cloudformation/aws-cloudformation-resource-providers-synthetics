@@ -5,6 +5,8 @@ import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeOutput;
 import software.amazon.awssdk.services.synthetics.model.CanaryScheduleOutput;
+import software.amazon.awssdk.services.synthetics.model.VisualReferenceInput;
+import software.amazon.awssdk.services.synthetics.model.VisualReferenceOutput;
 import software.amazon.awssdk.services.synthetics.model.VpcConfigOutput;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
@@ -250,6 +252,64 @@ public class ModelHelper {
         // default
         return "nodejs";
     }
+
+    public static boolean visualReferenceNeedsUpdate(VisualReferenceOutput existingVisualReference, VisualReference newVisualReference) {
+        if (newVisualReference == null) {
+            return false;
+        }
+        if (existingVisualReference == null
+                || newVisualReference.getBaseScreenshots() == null
+                || existingVisualReference.baseScreenshots() != null && existingVisualReference.baseScreenshots().size() != newVisualReference.getBaseScreenshots().size()
+                || newVisualReference.getBaseCanaryRunId() != existingVisualReference.baseCanaryRunId()) {
+            return true;
+        }
+
+        for(int item = 0; item < newVisualReference.getBaseScreenshots().size(); item++) {
+            // Screenshots
+            if (newVisualReference.getBaseScreenshots().get(item).getScreenshotName() != existingVisualReference.baseScreenshots().get(item).screenshotName()){
+                return true;
+            }
+
+            // Ignore boundaries
+            if (existingVisualReference.baseScreenshots().get(item).ignoreCoordinates() == null) {
+                continue;
+            }
+            if (existingVisualReference.baseScreenshots().get(item).ignoreCoordinates() != null
+                    && existingVisualReference.baseScreenshots().get(item).ignoreCoordinates().size() != newVisualReference.getBaseScreenshots().get(item).getIgnoreCoordinates().size()){
+                return true;
+            }
+
+            for(int ignoreItem = 0; ignoreItem < existingVisualReference.baseScreenshots().get(item).ignoreCoordinates().size(); ignoreItem++) {
+                if (existingVisualReference.baseScreenshots().get(item).ignoreCoordinates().get(ignoreItem) != newVisualReference.getBaseScreenshots().get(item).getIgnoreCoordinates().get(ignoreItem)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static VisualReferenceInput getVisualReferenceInput(VisualReference newVisualReference) {
+        if (newVisualReference == null) {
+            return null;
+        }
+        List<software.amazon.awssdk.services.synthetics.model.BaseScreenshot> baseScreenshotList = new ArrayList<>();
+        String canaryRunId = newVisualReference.getBaseCanaryRunId();
+        if (newVisualReference.getBaseScreenshots() != null) {
+            for (BaseScreenshot baseScreenshot : newVisualReference.getBaseScreenshots()) {
+                software.amazon.awssdk.services.synthetics.model.BaseScreenshot newBaseScreenshot = software.amazon.awssdk.services.synthetics.model.BaseScreenshot.builder()
+                        .screenshotName(baseScreenshot.getScreenshotName())
+                        .ignoreCoordinates(baseScreenshot.getIgnoreCoordinates())
+                        .build();
+                baseScreenshotList.add(newBaseScreenshot);
+            }
+        }
+        VisualReferenceInput visualReferenceInput = VisualReferenceInput.builder()
+                .baseScreenshots(baseScreenshotList)
+                .baseCanaryRunId(canaryRunId)
+                .build();
+        return visualReferenceInput;
+    }
+
 }
 
 

@@ -19,5 +19,18 @@
       "Key": "key002",
       "Value": "value002"
     }
-  ]
+  ],
+  "VisualReference" : {
+    "BaseScreenshots" : [
+      {
+        "ScreenshotName" : "1-test-base.png",
+        "IgnoreCoordinates" : []
+      },
+      {
+        "ScreenshotName" : "2-test-base.png",
+        "IgnoreCoordinates" : []
+      }
+    ],
+    "BaseCanaryRunId": "lastrun"
+  }
 }
