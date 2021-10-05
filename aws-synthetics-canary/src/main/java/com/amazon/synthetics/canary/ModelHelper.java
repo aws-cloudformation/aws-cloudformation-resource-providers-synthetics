@@ -2,9 +2,11 @@ package com.amazon.synthetics.canary;
 
 import software.amazon.awssdk.arns.Arn;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.services.synthetics.model.ArtifactConfigInput;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeOutput;
 import software.amazon.awssdk.services.synthetics.model.CanaryScheduleOutput;
+import software.amazon.awssdk.services.synthetics.model.S3EncryptionConfig;
 import software.amazon.awssdk.services.synthetics.model.VisualReferenceInput;
 import software.amazon.awssdk.services.synthetics.model.VisualReferenceOutput;
 import software.amazon.awssdk.services.synthetics.model.VpcConfigOutput;
@@ -246,7 +248,7 @@ public class ModelHelper {
     private static String getRuntimeLanguage(String runtimeVersion) {
         Matcher python_matcher = python_pattern.matcher(runtimeVersion);
         // python runtime
-        if(python_matcher.matches()) {
+        if (python_matcher.matches()) {
             return "python";
         }
         // default
@@ -257,6 +259,7 @@ public class ModelHelper {
         if (newVisualReference == null) {
             return false;
         }
+
         if (existingVisualReference == null
                 || newVisualReference.getBaseScreenshots() == null
                 || existingVisualReference.baseScreenshots() != null && existingVisualReference.baseScreenshots().size() != newVisualReference.getBaseScreenshots().size()
@@ -310,8 +313,18 @@ public class ModelHelper {
         return visualReferenceInput;
     }
 
+    public static ArtifactConfigInput getArtifactConfigInput(ArtifactConfig artifactConfig) {
+        S3Encryption s3Encryption = artifactConfig != null ? artifactConfig.getS3Encryption() : null;
+        String encryptionMode = null;
+        String kmsKeyArn = null;
+
+        if (s3Encryption != null) {
+            encryptionMode = s3Encryption.getEncryptionMode();
+            kmsKeyArn = s3Encryption.getKmsKeyArn();
+        }
+
+        return ArtifactConfigInput.builder().s3Encryption(S3EncryptionConfig.builder()
+                .encryptionMode(encryptionMode)
+                .kmsKeyArn(kmsKeyArn).build()).build();
+    }
 }
-
-
-
-

@@ -882,5 +882,214 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response.getResourceModel().getVisualReference().getBaseScreenshots()).isNull();
     }
 
-}
+    @Test
+    public void handleRequest_updateArtifactEncryptionFromNullToPresent() {
+        ResourceModel model = buildModel();
 
+        final ArtifactConfig artifactConfig = new ArtifactConfig();
+        final S3Encryption s3Encryption = new S3Encryption();
+        s3Encryption.setEncryptionMode("SSE_KMS");
+        s3Encryption.setKmsKeyArn("arn:aws:kms:us-west-2:222222222222:key/kmsKeyId");
+        artifactConfig.setS3Encryption(s3Encryption);
+        model.setArtifactConfig(artifactConfig);
+
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(true).build())
+                .schedule(canaryScheduleOutputWithNullDurationForTesting())
+                .runtimeVersion("syn-nodejs-2.0-beta")
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModel().getArtifactConfig().getS3Encryption().getEncryptionMode()).isEqualTo("SSE_KMS");
+        assertThat(response.getResourceModel().getArtifactConfig().getS3Encryption().getKmsKeyArn()).isEqualTo("arn:aws:kms:us-west-2:222222222222:key/kmsKeyId");
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
+    public void handleRequest_updateArtifactEncryptionFromPresentToEmpty() {
+        ResourceModel model = buildModel();
+        final ArtifactConfig artifactConfig = new ArtifactConfig();
+        final S3Encryption s3Encryption = new S3Encryption();
+        artifactConfig.setS3Encryption(s3Encryption);
+        model.setArtifactConfig(artifactConfig);
+
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(false).build())
+                .schedule(canaryScheduleOutputWithNullDurationForTesting())
+                .artifactConfig(ArtifactConfigOutput.builder()
+                        .s3Encryption(S3EncryptionConfig.builder()
+                                .encryptionMode(EncryptionMode.SSE_KMS)
+                                .kmsKeyArn("arn:aws:kms:us-west-2:222222222222:key/kmsKeyId").build()).build())
+                .runtimeVersion("syn-nodejs-2.0-beta")
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModel().getArtifactConfig().getS3Encryption().getEncryptionMode()).isNull();
+        assertThat(response.getResourceModel().getArtifactConfig().getS3Encryption().getKmsKeyArn()).isNull();
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
+    public void handleRequest_updateArtifactEncryptionFromPresentToNull() {
+        ResourceModel model = buildModel();
+
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(false).build())
+                .schedule(canaryScheduleOutputWithNullDurationForTesting())
+                .artifactConfig(ArtifactConfigOutput.builder()
+                        .s3Encryption(S3EncryptionConfig.builder()
+                                .encryptionMode(EncryptionMode.SSE_KMS)
+                                .kmsKeyArn("arn:aws:kms:us-west-2:222222222222:key/kmsKeyId").build()).build())
+                .runtimeVersion("syn-nodejs-2.0-beta")
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModel().getArtifactConfig()).isNull();
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+
+    @Test
+    public void handleRequest_updateArtifactEncryptionFromKmsEncryptionToSSES3() {
+        ResourceModel model = buildModel();
+
+        final ArtifactConfig artifactConfig = new ArtifactConfig();
+        final S3Encryption s3Encryption = new S3Encryption();
+        s3Encryption.setEncryptionMode("SSE_S3");
+        artifactConfig.setS3Encryption(s3Encryption);
+        model.setArtifactConfig(artifactConfig);
+
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        Map<String, String> tagExisting = new HashMap<>();
+        tagExisting.put("key2","value2");
+
+        final Canary canary = Canary.builder()
+                .name("canarytestname")
+                .executionRoleArn("test execution arn")
+                .code(codeOutputObjectForTesting())
+                .status(CanaryStatus.builder()
+                        .state("RUNNING")
+                        .build())
+                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).activeTracing(false).build())
+                .schedule(canaryScheduleOutputWithNullDurationForTesting())
+                .artifactConfig(ArtifactConfigOutput.builder()
+                        .s3Encryption(S3EncryptionConfig.builder()
+                                .encryptionMode(EncryptionMode.SSE_KMS)
+                                .kmsKeyArn("arn:aws:kms:us-west-2:222222222222:key/kmsKeyId").build()).build())
+                .runtimeVersion("syn-nodejs-2.0-beta")
+                .tags(tagExisting)
+                .build();
+
+        final CallbackContext callbackContext = CallbackContext.builder().build();
+
+        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
+                .canary(canary)
+                .build();
+
+        doReturn(getCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getResourceModel().getSchedule().getDurationInSeconds()).isEqualTo("3600");
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getResourceModel().getArtifactConfig().getS3Encryption().getEncryptionMode()).isEqualTo("SSE_S3");
+        assertThat(response.getResourceModel().getArtifactConfig().getS3Encryption().getKmsKeyArn()).isNull();
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+    }
+}
