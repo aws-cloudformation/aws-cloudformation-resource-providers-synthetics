@@ -146,6 +146,7 @@ public class CreateHandler extends CanaryActionHandler {
                 .failureRetentionPeriodInDays(model.getFailureRetentionPeriod())
                 .successRetentionPeriodInDays(model.getSuccessRetentionPeriod())
                 .runConfig(canaryRunConfigInput)
+                .artifactConfig(ModelHelper.getArtifactConfigInput(model.getArtifactConfig()))
                 .build();
         try {
             proxy.injectCredentialsAndInvokeV2(createCanaryRequest, syntheticsClient::createCanary);

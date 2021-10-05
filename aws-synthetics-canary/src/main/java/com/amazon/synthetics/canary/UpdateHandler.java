@@ -159,8 +159,10 @@ public class UpdateHandler extends CanaryActionHandler {
         Integer successRetentionPeriodInDays = canary.successRetentionPeriodInDays();
         Integer failureRetentionPeriodInDays = canary.failureRetentionPeriodInDays();
         String executionRoleArn = canary.executionRoleArn();
+        String artifactS3Location = canary.artifactS3Location();
         VpcConfigInput vpcConfigInput = null;
         VisualReferenceInput visualReferenceInput = null;
+        ArtifactConfigInput artifactConfigInput = null;
 
         if (!Objects.equals(handlerName, model.getCode().getHandler())) {
             log("Updating handler");
@@ -194,7 +196,7 @@ public class UpdateHandler extends CanaryActionHandler {
                 activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
             }
 
-            //Since we cannot get environment variables in the get call, as far as the value is present in the request, we replace
+            // Since we cannot get environment variables in the get call, as far as the value is present in the request, we replace
             if (model.getRunConfig().getEnvironmentVariables() != null) {
                 log("Replacing environment variables");
                 environmentVariables = model.getRunConfig().getEnvironmentVariables();
@@ -229,6 +231,11 @@ public class UpdateHandler extends CanaryActionHandler {
             visualReferenceInput = ModelHelper.getVisualReferenceInput(model.getVisualReference());
         }
 
+        if (!Objects.equals(artifactS3Location, model.getArtifactS3Location())) {
+            log("Updating ArtifactS3Location");
+            artifactS3Location = model.getArtifactS3Location();
+        }
+
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
                 .handler(handlerName)
                 .s3Bucket(model.getCode().getS3Bucket())
@@ -242,14 +249,15 @@ public class UpdateHandler extends CanaryActionHandler {
                 .durationInSeconds(durationInSecs != null ? Long.valueOf(durationInSecs) : null).build();
 
         final CanaryRunConfigInput canaryRunConfigInput = CanaryRunConfigInput.builder()
-            .timeoutInSeconds(timeoutInSeconds)
-            .memoryInMB(memoryInMB)
-            .activeTracing(activeTracing)
-            .environmentVariables(environmentVariables)
-            .build();
+                .timeoutInSeconds(timeoutInSeconds)
+                .memoryInMB(memoryInMB)
+                .activeTracing(activeTracing)
+                .environmentVariables(environmentVariables)
+                .build();
 
         final UpdateCanaryRequest updateCanaryRequest = UpdateCanaryRequest.builder()
                 .name(model.getName())
+                .artifactS3Location(artifactS3Location)
                 .code(canaryCodeInput)
                 .executionRoleArn(executionRoleArn)
                 .runtimeVersion(model.getRuntimeVersion())
@@ -258,6 +266,7 @@ public class UpdateHandler extends CanaryActionHandler {
                 .successRetentionPeriodInDays(successRetentionPeriodInDays)
                 .failureRetentionPeriodInDays(failureRetentionPeriodInDays)
                 .vpcConfig(vpcConfigInput)
+                .artifactConfig(ModelHelper.getArtifactConfigInput(model.getArtifactConfig()))
                 .visualReference(visualReferenceInput)
                 .build();
 
