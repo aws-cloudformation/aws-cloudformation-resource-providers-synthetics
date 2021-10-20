@@ -7,6 +7,7 @@ import software.amazon.cloudformation.Action;
 import software.amazon.cloudformation.exceptions.*;
 import software.amazon.cloudformation.proxy.*;
 
+import java.util.Collections;
 import java.util.Map;
 
 public class UpdateHandler extends CanaryActionHandler {
@@ -208,6 +209,11 @@ public class UpdateHandler extends CanaryActionHandler {
             vpcConfigInput = VpcConfigInput.builder()
                 .subnetIds(model.getVPCConfig().getSubnetIds())
                 .securityGroupIds(model.getVPCConfig().getSecurityGroupIds())
+                .build();
+        } else {
+            vpcConfigInput = VpcConfigInput.builder()
+                .subnetIds(Collections.emptyList())
+                .securityGroupIds(Collections.emptyList())
                 .build();
         }
 
