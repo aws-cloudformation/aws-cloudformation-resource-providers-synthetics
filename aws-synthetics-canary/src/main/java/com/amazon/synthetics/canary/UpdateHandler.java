@@ -83,6 +83,21 @@ public class UpdateHandler extends CanaryActionHandler {
     private ProgressEvent<ResourceModel, CallbackContext> handleCanaryInStateReadyOrStopped(Canary canary) {
         log(String.format("Canary is in state %s.", canary.status().stateAsString()));
 
+        /* After an update, If canary is in READY or STOPPED state with stateReason message, it indicates that update has failed.
+            1. If the canary was initially in READY or STOPPED state and there was an error
+            during provisioning, then it will be set to READY or STOPPED state again and the message
+            will be in the StateReason field.
+            2. A canary initially in Running state can also be set to state STOPPED if it was a run once canary and update failed but meanwhile canary execution has come to an end.
+         */
+        if (!Strings.isNullOrEmpty(canary.status().stateReason())) {
+            log(String.format("Update failed: %s", canary.status().stateReason()));
+            return ProgressEvent.failed(
+                    model,
+                    context,
+                    HandlerErrorCode.GeneralServiceException,
+                    canary.status().stateReason());
+        }
+
         if (model.getStartCanaryAfterCreation()) {
             // There is a race condition here. We will get an exception if someone calls
             // DeleteCanary, StartCanary, or UpdateCanary before we call StartCanary.
@@ -191,7 +206,7 @@ public class UpdateHandler extends CanaryActionHandler {
                 log("Updating memory");
                 memoryInMB = model.getRunConfig().getMemoryInMB();
             }
-            
+
             if (model.getRunConfig().getActiveTracing() != null && !Objects.equals(activeTracing, model.getRunConfig().getActiveTracing())) {
                 log("Updating active tracing");
                 activeTracing = Boolean.TRUE.equals(model.getRunConfig().getActiveTracing());
