@@ -6,7 +6,7 @@ import software.amazon.cloudformation.exceptions.CfnResourceConflictException;
 import software.amazon.cloudformation.proxy.*;
 
 public class DeleteHandler extends CanaryActionHandler {
-    private static final int MAX_RETRY_TIMES = 10;
+    private static final int MAX_RETRY_TIMES = 20;
 
     public DeleteHandler() {
         super(Action.DELETE);
@@ -39,6 +39,8 @@ public class DeleteHandler extends CanaryActionHandler {
             return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "STOPPING");
         } else if (canary.status().state() == CanaryState.RUNNING) {
             return handleCanaryInStateRunning(canary);
+        } else if (canary.status().state() == CanaryState.DELETING) {
+            return confirmCanaryDeleted();
         } else {
             return deleteCanary(canary);
         }
@@ -62,11 +64,12 @@ public class DeleteHandler extends CanaryActionHandler {
     private ProgressEvent<ResourceModel, CallbackContext> deleteCanary(Canary canary) {
         // The canary will be deleted once DeleteCanary returns.
         log("Deleting canary.");
-
         try {
             proxy.injectCredentialsAndInvokeV2(
                 DeleteCanaryRequest.builder()
                     .name(canary.name())
+                    .deleteLambda(model.getDeleteLambdaResourcesOnCanaryDeletion() != null ?
+                        model.getDeleteLambdaResourcesOnCanaryDeletion() : false)
                     .build(),
                 syntheticsClient::deleteCanary);
         } catch (ResourceNotFoundException e) {

@@ -96,34 +96,39 @@ public class DeleteHandlerTest extends TestBase {
             handler.handleRequest(proxy, REQUEST, null, logger);
 
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any());
+        verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
+            .deleteLambda(false).build()), any());
     }
 
     @ParameterizedTest
     @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
     public void handleRequest_canaryStateAllows_invokesDeleteCanary_handlesAlreadyDeleted_success(CanaryState state) {
         configureGetCanaryResponse(state);
-        when(proxy.injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any()))
+        when(proxy.injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
+            .deleteLambda(false).build()), any()))
             .thenThrow(ResourceNotFoundException.builder().build());
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, null, logger);
 
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
-        verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any());
+        verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
+            .deleteLambda(false).build()), any());
     }
 
     @ParameterizedTest
     @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
     public void handleRequest_canaryStateAllows_invokesDeleteCanary_handlesConflict_fails(CanaryState state) {
         configureGetCanaryResponse(state);
-        when(proxy.injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any()))
+        when(proxy.injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
+            .deleteLambda(false).build()), any()))
             .thenThrow(ConflictException.builder().build());
 
         assertThatThrownBy(() -> handler.handleRequest(proxy, REQUEST, null, logger))
             .isInstanceOf(CfnResourceConflictException.class);
 
-        verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME).build()), any());
+        verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
+            .deleteLambda(false).build()), any());
     }
 
     @Test
