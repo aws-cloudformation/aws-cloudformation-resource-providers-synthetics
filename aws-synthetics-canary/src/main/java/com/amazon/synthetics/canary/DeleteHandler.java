@@ -6,7 +6,7 @@ import software.amazon.cloudformation.exceptions.CfnResourceConflictException;
 import software.amazon.cloudformation.proxy.*;
 
 public class DeleteHandler extends CanaryActionHandler {
-    private static final int MAX_RETRY_TIMES = 20;
+    private static final int MAX_RETRY_TIMES = 10;
 
     public DeleteHandler() {
         super(Action.DELETE);
