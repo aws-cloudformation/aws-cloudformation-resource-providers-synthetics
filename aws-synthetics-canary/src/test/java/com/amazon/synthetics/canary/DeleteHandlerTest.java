@@ -10,7 +10,10 @@ import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundExceptio
 import software.amazon.awssdk.services.synthetics.model.StopCanaryRequest;
 import software.amazon.cloudformation.exceptions.CfnNotFoundException;
 import software.amazon.cloudformation.exceptions.CfnResourceConflictException;
-import software.amazon.cloudformation.proxy.*;
+import software.amazon.cloudformation.proxy.HandlerErrorCode;
+import software.amazon.cloudformation.proxy.OperationStatus;
+import software.amazon.cloudformation.proxy.ProgressEvent;
+
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -102,6 +105,20 @@ public class DeleteHandlerTest extends TestBase {
 
     @ParameterizedTest
     @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
+    public void handleRequest_canaryStateAllows_invokesDeleteCanaryWithDeleteLambda_inProgress(CanaryState state) {
+        configureGetCanaryResponse(state);
+
+
+        ProgressEvent<ResourceModel, CallbackContext> response =
+            handler.handleRequest(proxy, REQUEST_WITH_DELETELAMBDA, null, logger);
+
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
+            .deleteLambda(true).build()), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
     public void handleRequest_canaryStateAllows_invokesDeleteCanary_handlesAlreadyDeleted_success(CanaryState state) {
         configureGetCanaryResponse(state);
         when(proxy.injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
@@ -114,6 +131,22 @@ public class DeleteHandlerTest extends TestBase {
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
         verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
             .deleteLambda(false).build()), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
+    public void handleRequest_canaryStateAllows_invokesDeleteCanaryWithDeleteLambda_handlesAlreadyDeleted_success(CanaryState state) {
+        configureGetCanaryResponse(state);
+        when(proxy.injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
+            .deleteLambda(true).build()), any()))
+            .thenThrow(ResourceNotFoundException.builder().build());
+
+        ProgressEvent<ResourceModel, CallbackContext> response =
+            handler.handleRequest(proxy, REQUEST_WITH_DELETELAMBDA, null, logger);
+
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        verify(proxy).injectCredentialsAndInvokeV2(eq(DeleteCanaryRequest.builder().name(CANARY_NAME)
+            .deleteLambda(true).build()), any());
     }
 
     @ParameterizedTest
@@ -142,12 +175,42 @@ public class DeleteHandlerTest extends TestBase {
     }
 
     @Test
+    public void handleRequest_confirmCanaryDeleted_canaryExists_WithDeleteLambda__inProgress() {
+        CallbackContext context = CallbackContext.builder().canaryDeleteStarted(true).build();
+        configureGetCanaryResponse(CanaryState.READY);
+
+        ProgressEvent<ResourceModel, CallbackContext> response =
+            handler.handleRequest(proxy, REQUEST_WITH_DELETELAMBDA, context, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+    }
+
+    @Test
+    public void handleRequest_confirmCanaryDeleted_canaryExistsInDELETING_WithDeleteLambda__inProgress() {
+        CallbackContext context = CallbackContext.builder().canaryDeleteStarted(true).build();
+        configureGetCanaryResponse(CanaryState.DELETING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response =
+            handler.handleRequest(proxy, REQUEST_WITH_DELETELAMBDA, context, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+    }
+
+    @Test
     public void handleRequest_confirmCanaryDeleted_canaryNotFound_success() {
         CallbackContext context = CallbackContext.builder().canaryDeleteStarted(true).build();
         configureGetCanaryResponse(ResourceNotFoundException.builder().build());
 
         ProgressEvent<ResourceModel, CallbackContext> response =
             handler.handleRequest(proxy, REQUEST, context, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+    }
+
+    @Test
+    public void handleRequest_confirmCanaryDeleted_canaryNotFound_WithDeleteLambda_success() {
+        CallbackContext context = CallbackContext.builder().canaryDeleteStarted(true).build();
+        configureGetCanaryResponse(ResourceNotFoundException.builder().build());
+
+        ProgressEvent<ResourceModel, CallbackContext> response =
+            handler.handleRequest(proxy, REQUEST_WITH_DELETELAMBDA, context, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 

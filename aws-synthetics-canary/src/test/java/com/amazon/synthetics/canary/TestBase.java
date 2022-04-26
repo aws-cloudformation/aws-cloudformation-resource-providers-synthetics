@@ -19,13 +19,19 @@ public class TestBase {
     protected static final String CANARY_NAME = "canary-name";
     protected static final String ERROR_STATE_REASON = "Failure message";
 
+    protected static final ResourceHandlerRequest<ResourceModel> REQUEST_WITH_DELETELAMBDA = ResourceHandlerRequest.<ResourceModel>builder()
+        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false, true, true))
+        .awsPartition("aws")
+        .region("us-west-2")
+        .build();
+
     protected static final ResourceHandlerRequest<ResourceModel> REQUEST = ResourceHandlerRequest.<ResourceModel>builder()
-        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false, true))
+        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false, true, null))
         .awsPartition("aws")
         .region("us-west-2")
         .build();
     protected static final ResourceHandlerRequest<ResourceModel> REQUEST_START_CANARY = ResourceHandlerRequest.<ResourceModel>builder()
-        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, true, true))
+        .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, true, true, null))
         .awsPartition("aws")
         .region("us-west-2")
         .build();
@@ -196,17 +202,17 @@ public class TestBase {
     }
 
     protected static ResourceModel buildModel() {
-        return buildModel("syn-1.0", null, true, true);
+        return buildModel("syn-1.0", null, true, true, null);
     }
 
     protected static ResourceModel buildModel(boolean useOptionalValues) {
-        return buildModel("syn-1.0", null, true, false);
+        return buildModel("syn-1.0", null, true, false, null);
     }
 
     protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing) {
-        return buildModel(runtimeVersion, isActiveTracing, true, true);
+        return buildModel(runtimeVersion, isActiveTracing, true, true, null);
     }
-    protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing, Boolean startCanaryAfterCreation, boolean useOptionalValues) {
+    protected static ResourceModel buildModel(String runtimeVersion, Boolean isActiveTracing, Boolean startCanaryAfterCreation, boolean useOptionalValues, Boolean deleteLambdaResources) {
         final Code codeObjectForTesting = new Code(null,
             null,
             null,
@@ -269,6 +275,7 @@ public class TestBase {
                     .schedule(scheduleForTesting)
                     .runtimeVersion(runtimeVersion)
                     .startCanaryAfterCreation(startCanaryAfterCreation)
+                    .deleteLambdaResourcesOnCanaryDeletion(deleteLambdaResources)
                     .vPCConfig(vpcConfig)
                     .tags(listTag)
                     .runConfig(runConfig)
