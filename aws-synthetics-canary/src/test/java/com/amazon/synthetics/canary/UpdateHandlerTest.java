@@ -310,7 +310,7 @@ public class UpdateHandlerTest extends TestBase {
     @Test
     public void handleRequest_updateWithRemovedTimeout(){
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(buildModel("syn-nodejs-2.0-beta", null, true, false))
+                .desiredResourceState(buildModel("syn-nodejs-2.0-beta", null, true, false, false))
                 .build();
 
         Map<String, String> tagExisting = new HashMap<>();
