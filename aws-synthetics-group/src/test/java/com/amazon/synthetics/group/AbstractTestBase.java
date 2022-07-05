@@ -2,7 +2,9 @@ package com.amazon.synthetics.group;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import org.junit.jupiter.api.AfterEach;
@@ -15,6 +17,7 @@ import software.amazon.awssdk.core.SdkClient;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.CreateGroupRequest;
 import software.amazon.awssdk.services.synthetics.model.CreateGroupResponse;
@@ -50,11 +53,23 @@ public class AbstractTestBase {
   @Mock
   protected SyntheticsClient syntheticsClient;
 
+  @Mock
+  protected Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap;
+
   @BeforeEach
   public void setup() {
     proxy = new AmazonWebServicesClientProxy(logger, MOCK_CREDENTIALS, () -> Duration.ofSeconds(600).toMillis());
     syntheticsClient = mock(SyntheticsClient.class);
+    proxyClientMap = generateMockClientMap();
     proxyClient = MOCK_PROXY(proxy, syntheticsClient);
+  }
+
+  private Map<Region, ProxyClient<SyntheticsClient>> generateMockClientMap() {
+    Map<Region, ProxyClient<SyntheticsClient>> map = new HashMap<>();
+    for(Region region:  Region.regions()) {
+      map.put(region, MOCK_PROXY(proxy, syntheticsClient));
+    }
+    return map;
   }
 
   static {
@@ -110,9 +125,14 @@ public class AbstractTestBase {
   }
 
   protected List<String> generateListOfCanaryArns() {
+   return generateListOfCanaryArns("us-west-2");
+  }
+
+  protected List<String> generateListOfCanaryArns(String region) {
     List<String> canaryArns = new ArrayList<>();
     for(int index = 0 ; index < 20; index ++) {
-      canaryArns.add("arn:aws:us-west-2:canary-" + index);
+      canaryArns.add("arn:aws:synthetics:" + region + ":761914923529:canary:canary-" + index);
+
     }
     return canaryArns;
   }

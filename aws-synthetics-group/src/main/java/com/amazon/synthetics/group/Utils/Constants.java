@@ -7,6 +7,8 @@ public class Constants {
     public static final String GROUP_NOT_FOUND = "The group was not found";
     public static final String GET_GROUP_CALL = "Making get group call";
     public static final String LIST_GROUP_RESOURCES_CALL = "Making list group resources call";
+    public static final String TAG_RESOURCE_CALL = "Making tag group resource call";
+    public static final String UNTAG_RESOURCE_CALL = "Making untag group resource call";
     public static final String MAKING_CREATE_GROUP = "Making create group call";
     public static final String GROUP_CREATION_SUCCESSFUL = "Synthetics Group creation successful";
     public static final String MAKING_ADD_ASSOCIATE = "Making add association call";

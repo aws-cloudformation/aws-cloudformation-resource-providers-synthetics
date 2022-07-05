@@ -1,12 +1,15 @@
 package com.amazon.synthetics.group;
 
 import com.amazon.synthetics.group.Utils.Constants;
+import java.util.Map;
+import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.ListGroupsRequest;
 import software.amazon.awssdk.services.synthetics.model.ListGroupsResponse;
-import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.synthetics.model.ValidationException;
 import software.amazon.cloudformation.Action;
+import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 import software.amazon.cloudformation.proxy.HandlerErrorCode;
+import software.amazon.cloudformation.proxy.Logger;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.OperationStatus;
 
@@ -26,7 +29,7 @@ public class ListHandler extends BaseHandlerStd {
         try{
             // make an api call
             ListGroupsResponse listGroupsResponse = webServiceProxy.injectCredentialsAndInvokeV2(listGroupsRequest,
-                ClientBuilder.getClient()::listGroups);
+                proxyClient.client()::listGroups);
 
             // get a token for the next page
             String nextToken = listGroupsResponse == null ? null : listGroupsResponse.nextToken();
@@ -39,12 +42,6 @@ public class ListHandler extends BaseHandlerStd {
                 .nextToken(nextToken)
                 .status(OperationStatus.SUCCESS)
                 .build();
-        } catch (ResourceNotFoundException exception) {
-            return ProgressEvent.failed(
-                model,
-                callbackContext,
-                HandlerErrorCode.InvalidRequest,
-                Constants.RESOURCE_NOT_FOUND);
         } catch (ValidationException exception) {
             return ProgressEvent.failed(
                 model,

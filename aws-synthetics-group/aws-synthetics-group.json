@@ -9,7 +9,7 @@
             "pattern": "^[0-9a-z_\\-]{1,64}$"
         },
         "Id": {
-            "description": "Id of the group",
+            "description": "Id of the group.",
             "type": "string"
         },
         "Tags" : {

@@ -39,6 +39,10 @@ public class CreateHandler extends BaseHandlerStd {
         return addAssociatedResources(false);
     }
 
+    /**
+     * Wrapper around create Group api call to Synthetics client and handle the response/ error
+     * @return success or in progress event depending on presence or absence of resourcearns
+     */
     private ProgressEvent<ResourceModel, CallbackContext> createGroup() {
         // Translate resource model to create group request
         // call create group request

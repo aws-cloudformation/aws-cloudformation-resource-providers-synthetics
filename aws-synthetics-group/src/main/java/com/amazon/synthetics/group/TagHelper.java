@@ -137,11 +137,17 @@ public class TagHelper {
         return desiredTags;
     }
 
+    /**
+     * Method to determine if the tags changed and return the tags to add and remove
+     * @param model: To get the new tags
+     * @param existingTags: Map of existing tags
+     * @return Map of map of Tags to be added and removed
+     */
     public static Map<String, Map<String, String>> updateTags(ResourceModel model, Map<String, String> existingTags) {
         Map<String, String> modelTagMap = new HashMap<>();
         List<Tag> modelTagList = model.getTags();
         Set<Map.Entry<String, String>> modelTagsES = null;
-        Set<Map.Entry<String, String>> canaryTags = null;
+        Set<Map.Entry<String, String>> groupTags = null;
         Set<Map.Entry<String, String>> modelTagsCopyES = null;
         Map<String, Map<String, String>> store = new HashMap<String, Map<String, String>>();
         Map<String, String> copyExistingTags = new HashMap<>(existingTags);
@@ -154,58 +160,43 @@ public class TagHelper {
             modelTagsCopyES = new HashSet<Map.Entry<String, String>>(modelTagMap.entrySet());
         }
 
-        canaryTags = copyExistingTags.entrySet();
+        groupTags = copyExistingTags.entrySet();
 
         if (modelTagList == null) {
             return null;
         }
-        Set<Map.Entry<String, String>> finalCanaryTags = canaryTags;
+        Set<Map.Entry<String, String>> finalGroupTags = groupTags;
         // Get an iterator
         Iterator<Map.Entry<String, String>> modelIterator = modelTagsES.iterator();
         while (modelIterator.hasNext()) {
             Map.Entry<String, String> modelEntry = modelIterator.next();
-            if (finalCanaryTags.contains(modelEntry)) {
+            if (finalGroupTags.contains(modelEntry)) {
                 modelIterator.remove();
             }
         }
-        // Store all the tags that need to be added to the canary
+        // Store all the tags that need to be added to the group
         store.put(Constants.ADD_TAGS, modelTagMap);
 
-        Iterator<Map.Entry<String, String>> canaryTagIterator = finalCanaryTags.iterator();
-        while (canaryTagIterator.hasNext()) {
-            Map.Entry<String, String> canaryEntry = canaryTagIterator.next();
+        Iterator<Map.Entry<String, String>> groupTagIterator = finalGroupTags.iterator();
+        while (groupTagIterator.hasNext()) {
+            Map.Entry<String, String> canaryEntry = groupTagIterator.next();
             try {
                 if (modelTagsCopyES.contains(canaryEntry)) {
-                    canaryTagIterator.remove();
+                    groupTagIterator.remove();
                 }
                 if (canaryEntry.getKey().toString().startsWith("aws:")) {
-                    canaryTagIterator.remove();
+                    groupTagIterator.remove();
                 }
                 if (!modelTagMap.isEmpty() && modelTagMap.containsKey(canaryEntry.getKey())) {
-                    canaryTagIterator.remove();
+                    groupTagIterator.remove();
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        // Store all the tags that need to be removed to the canary
+        // Store all the tags that need to be removed from the group
         store.put(Constants.REMOVE_TAGS, copyExistingTags);
         return store;
-    }
-
-    public static String buildGroupArn(ResourceHandlerRequest<ResourceModel> request, String groupId) {
-        String accountId = request.getAwsAccountId();
-        String region = request.getRegion();
-        String resource = String.format("%s:%s", "group", groupId);
-        String partition = request.getAwsPartition() != null ? request.getAwsPartition(): "aws";
-
-        Arn arn = Arn.builder().withAccountId(accountId)
-            .withPartition(partition)
-            .withRegion(region)
-            .withService("synthetics")
-            .withResource(resource)
-            .build();
-        return arn.toString();
     }
 
     /**

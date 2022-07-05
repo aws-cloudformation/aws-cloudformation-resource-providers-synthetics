@@ -1,21 +1,14 @@
 package com.amazon.synthetics.group;
 
 import com.amazon.synthetics.group.Utils.Constants;
-import java.time.Duration;
 import java.util.List;
-import software.amazon.awssdk.core.SdkClient;
-import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.AssociateResourceRequest;
 import software.amazon.awssdk.services.synthetics.model.AssociateResourceResponse;
 import software.amazon.awssdk.services.synthetics.model.DisassociateResourceRequest;
 import software.amazon.awssdk.services.synthetics.model.DisassociateResourceResponse;
-import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 import software.amazon.cloudformation.proxy.OperationStatus;
 import software.amazon.cloudformation.proxy.ProgressEvent;
-import software.amazon.cloudformation.proxy.ProxyClient;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -48,26 +41,20 @@ public class UpdateHandlerTest extends AbstractTestBase {
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
             .desiredResourceState(model)
             .build();
-        try {
-            ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-                createFirstCallBackContext(), proxyClient, logger);
-            assertThat(response).isNotNull();
-            assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-            assertThat(response.getCallbackContext().getAddResourceList().isEmpty());
-            assertThat(response.getCallbackDelaySeconds()).isEqualTo(Constants.DEFAULT_CALLBACK_DELAY_SECONDS);
-            assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-            assertThat(response.getResourceModels()).isNull();
-            assertThat(response.getMessage()).isEqualTo("Creating a diff for update completed");
-            assertThat(response.getErrorCode()).isNull();
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
+            createFirstCallBackContext(), proxyClientMap, logger);
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getCallbackContext().getAddResourceList().isEmpty());
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(Constants.DEFAULT_CALLBACK_DELAY_SECONDS);
+        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isEqualTo("Creating a diff for update completed");
+        assertThat(response.getErrorCode()).isNull();
 
-            response = handler.handleRequest(proxy, request,
-                response.getCallbackContext(), logger);
-            assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-
+        response = handler.handleRequest(proxy, request,
+            response.getCallbackContext(), proxyClientMap, logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 
     @Test
@@ -89,9 +76,8 @@ public class UpdateHandlerTest extends AbstractTestBase {
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
             .desiredResourceState(model)
             .build();
-
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClient, logger);
+            createFirstCallBackContext(), proxyClientMap, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -103,11 +89,11 @@ public class UpdateHandlerTest extends AbstractTestBase {
         assertThat(response.getErrorCode()).isNull();
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClient, logger);
+            response.getCallbackContext(), proxyClientMap, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClient, logger);
+            response.getCallbackContext(), proxyClientMap, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 
@@ -132,7 +118,7 @@ public class UpdateHandlerTest extends AbstractTestBase {
             .build();
 
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClient, logger);
+            createFirstCallBackContext(), proxyClientMap, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -144,11 +130,11 @@ public class UpdateHandlerTest extends AbstractTestBase {
         assertThat(response.getErrorCode()).isNull();
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClient, logger);
+            response.getCallbackContext(), proxyClientMap, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClient, logger);
+            response.getCallbackContext(), proxyClientMap, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 
@@ -164,7 +150,7 @@ public class UpdateHandlerTest extends AbstractTestBase {
 
         final UpdateHandler handler = new UpdateHandler();
         canaryArns = canaryArns.subList(0, 19);
-        canaryArns.add("new-arn");
+        canaryArns.add("arn:aws:synthetics:us-west-2:761914923529:canary:test-canary");
 
         final ResourceModel model = ResourceModel.builder()
             .name("test-group")
@@ -176,7 +162,7 @@ public class UpdateHandlerTest extends AbstractTestBase {
             .build();
 
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClient, logger);
+            createFirstCallBackContext(), proxyClientMap, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -189,18 +175,18 @@ public class UpdateHandlerTest extends AbstractTestBase {
         assertThat(response.getErrorCode()).isNull();
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClient, logger);
+            response.getCallbackContext(), proxyClientMap, logger);
         assertThat(response.getCallbackContext().getAddResourceList().isEmpty());
         assertThat(response.getCallbackContext().getRemoveResourceList().size()).isEqualTo(1);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClient, logger);
+            response.getCallbackContext(), proxyClientMap, logger);
         assertThat(response.getCallbackContext().getRemoveResourceList().isEmpty());
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClient, logger);
+            response.getCallbackContext(), proxyClientMap, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 }

@@ -39,7 +39,7 @@ public class UpdateHandler extends BaseHandlerStd {
                 diffGroupArnList(groupResources);
                 if (model.getTags() != null) {
                     Map<String, Map<String, String>> tagResourceMap = TagHelper.updateTags(model, group.tags());
-                    String groupArn = TagHelper.buildGroupArn(request, group.id());
+                    String groupArn = group.arn();
                     if (!tagResourceMap.get(Constants.ADD_TAGS).isEmpty()) {
                         addTags(tagResourceMap, groupArn);
                     }
@@ -83,8 +83,14 @@ public class UpdateHandler extends BaseHandlerStd {
         }
     }
 
+    /**
+     * Wrapper around tagResource call for Synthetics api and handle response/ error
+     * @param tagResourceMap
+     * @param groupArn
+     */
     private void addTags(Map<String, Map<String, String>> tagResourceMap, String groupArn) {
         try {
+            log(Constants.TAG_RESOURCE_CALL);
             TagResourceRequest tagResourceRequest = TagResourceRequest.builder()
                 .resourceArn(groupArn)
                 .tags(tagResourceMap.get(Constants.ADD_TAGS))
@@ -97,8 +103,14 @@ public class UpdateHandler extends BaseHandlerStd {
         }
     }
 
+    /**
+     * Wrapper around untagResource call for Synthetics api and handle response/ error
+     * @param tagResourceMap
+     * @param groupArn
+     */
     private void removeTags(Map<String, Map<String, String>> tagResourceMap, String groupArn) {
         try {
+            log(Constants.UNTAG_RESOURCE_CALL);
             UntagResourceRequest untagResourceRequest = UntagResourceRequest.builder()
                 .resourceArn(groupArn)
                 .tagKeys(tagResourceMap.get(Constants.REMOVE_TAGS).keySet())
@@ -132,6 +144,7 @@ public class UpdateHandler extends BaseHandlerStd {
         addResourceList = new ArrayList<>(model.getResourceArns());
         log("Group resources in model: " + model.getResourceArns().size());
         if (groupResources == null || groupResources.isEmpty()) {
+            callbackContext.setAddResourceList(addResourceList);
             return;
         }
         log("Group resources previous: " + groupResources.size());

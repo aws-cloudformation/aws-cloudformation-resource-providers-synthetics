@@ -33,7 +33,7 @@ public class DeleteHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClient, logger);
+            createFirstCallBackContext(), proxyClientMap, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
@@ -58,7 +58,7 @@ public class DeleteHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClient, logger);
+            createFirstCallBackContext(), proxyClientMap, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.FAILED);

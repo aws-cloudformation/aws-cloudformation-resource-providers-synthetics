@@ -6,6 +6,7 @@ import software.amazon.awssdk.services.synthetics.model.GroupSummary;
 import software.amazon.awssdk.services.synthetics.model.ListGroupsRequest;
 import software.amazon.awssdk.services.synthetics.model.ListGroupsResponse;
 import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
+import software.amazon.awssdk.services.synthetics.model.ValidationException;
 import software.amazon.cloudformation.proxy.HandlerErrorCode;
 import software.amazon.cloudformation.proxy.OperationStatus;
 import software.amazon.cloudformation.proxy.ProgressEvent;
@@ -23,7 +24,7 @@ import static org.mockito.Mockito.any;
 @ExtendWith(MockitoExtension.class)
 public class ListHandlerTest extends AbstractTestBase {
 
-    //@Test
+    @Test
     public void handleRequest_SimpleSuccess() {
         final ListHandler handler = new ListHandler();
         GroupSummary samplegrp = GroupSummary.builder().arn("arn:testArn").id("groupId").name("grp").build();
@@ -38,7 +39,7 @@ public class ListHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response =
-            handler.handleRequest(proxy, request, null, proxyClient, logger);
+            handler.handleRequest(proxy, request, null, proxyClientMap, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
@@ -51,12 +52,12 @@ public class ListHandlerTest extends AbstractTestBase {
 
     }
 
-    //@Test
+    @Test
     public void handleRequest_SimpleFailure() {
         final ListHandler handler = new ListHandler();
 
         when(syntheticsClient.listGroups(any(ListGroupsRequest.class)))
-            .thenThrow(ResourceNotFoundException.builder().build());
+            .thenThrow(ValidationException.builder().build());
 
         final ResourceModel model = ResourceModel.builder().build();
 
@@ -65,15 +66,12 @@ public class ListHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response =
-            handler.handleRequest(proxy, request, null, proxyClient, logger);
+            handler.handleRequest(proxy, request, null, proxyClientMap, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.FAILED);
-        assertThat(response.getCallbackContext()).isNull();
         assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
-        assertThat(response.getResourceModel()).isNull();
-        assertThat(response.getResourceModels()).isNotNull();
-        assertThat(response.getMessage()).isNull();
+        assertThat(response.getMessage()).isEqualTo("Invalid request");
         assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.InvalidRequest);
 
     }

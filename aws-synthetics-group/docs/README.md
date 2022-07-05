@@ -75,5 +75,5 @@ For more information about using the `Fn::GetAtt` intrinsic function, see [Fn::G
 
 #### Id
 
-Id of the group
+Id of the group.
 
