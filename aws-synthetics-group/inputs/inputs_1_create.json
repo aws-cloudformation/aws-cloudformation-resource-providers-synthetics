@@ -1,0 +1,9 @@
+{
+  "Name": "test-group",
+  "Tags": [
+    {
+      "Key": "tagKey",
+      "Value": "valueKey"
+    }
+  ]
+}
