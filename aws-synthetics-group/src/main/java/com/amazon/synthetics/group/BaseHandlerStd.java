@@ -83,8 +83,6 @@ public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
     this.proxyClientMap = proxyClientMap;
     this.proxyClient = proxyClientMap.get(region);
 
-    log("map: " + this.proxyClientMap);
-    log("map: " + this.proxyClientMap.get(region));
     log(Constants.INVOKING_HANDLER_MSG);
     ProgressEvent<ResourceModel, CallbackContext> response;
     try {

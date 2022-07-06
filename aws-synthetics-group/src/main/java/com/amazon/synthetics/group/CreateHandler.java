@@ -33,7 +33,7 @@ public class CreateHandler extends BaseHandlerStd {
         }
 
         if (!callbackContext.isGroupAssociationStarted()) {
-            callbackContext.setGroupRemoveAssociationStarted(true);
+            callbackContext.setGroupAssociationStarted(true);
             callbackContext.setAddResourceListIndex(0);
         }
         return addAssociatedResources(false);
