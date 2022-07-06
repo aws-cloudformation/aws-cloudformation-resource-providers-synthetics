@@ -49,7 +49,6 @@ public class CreateHandler extends BaseHandlerStd {
         log(Constants.MAKING_CREATE_GROUP);
         try {
             CreateGroupRequest createGroupRequest = Translator.translateToCreateRequest(model);
-            System.out.println(createGroupRequest);
             webServiceProxy.injectCredentialsAndInvokeV2(createGroupRequest,  proxyClient.client()::createGroup);
         } catch (final ValidationException e) {
             throw new CfnInvalidRequestException(e.getMessage());
