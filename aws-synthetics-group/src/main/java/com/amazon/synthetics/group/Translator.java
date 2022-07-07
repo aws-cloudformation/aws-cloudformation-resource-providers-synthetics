@@ -31,12 +31,13 @@ public class Translator {
    * @return createGroupRequest the aws create group request to create a resource
    */
   static CreateGroupRequest translateToCreateRequest(final ResourceModel model) {
-    final CreateGroupRequest createGroupRequest = CreateGroupRequest.builder()
-        .name(model.getName())
-        .tags(TagHelper.convertToMap(model.getTags()))
-        .build();
+    final CreateGroupRequest.Builder createGroupRequestBuilder = CreateGroupRequest.builder()
+        .name(model.getName());
 
-    return createGroupRequest;
+    if (model.getTags() != null && !model.getTags().isEmpty() ) {
+      createGroupRequestBuilder.tags(TagHelper.convertToMap(model.getTags()));
+    }
+    return createGroupRequestBuilder.build();
   }
 
   /**
