@@ -2,6 +2,7 @@ package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
+import software.amazon.awssdk.services.synthetics.model.ArtifactConfigOutput;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryRunConfigOutput;
 import software.amazon.awssdk.services.synthetics.model.GetCanaryRequest;
@@ -37,6 +38,14 @@ public class CanaryHelper {
 
         return runConfigOutput.timeoutInSeconds() == null
             && runConfigOutput.memoryInMB() == null;
+    }
+
+    public static boolean isNullOrEmpty(ArtifactConfigOutput artifactConfigOutput) {
+        if (artifactConfigOutput == null || artifactConfigOutput.s3Encryption() == null) {
+            return true;
+        }
+
+        return artifactConfigOutput.s3Encryption().encryptionMode() == null;
     }
 
     public static Canary getCanaryOrNull(AmazonWebServicesClientProxy proxy,

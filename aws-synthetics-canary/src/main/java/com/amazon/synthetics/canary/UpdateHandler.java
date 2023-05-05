@@ -2,10 +2,28 @@ package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
 import java.util.Objects;
-import software.amazon.awssdk.services.synthetics.model.*;
+
+import software.amazon.awssdk.services.synthetics.model.ArtifactConfigInput;
+import software.amazon.awssdk.services.synthetics.model.Canary;
+import software.amazon.awssdk.services.synthetics.model.CanaryCodeInput;
+import software.amazon.awssdk.services.synthetics.model.CanaryRunConfigInput;
+import software.amazon.awssdk.services.synthetics.model.CanaryScheduleInput;
+import software.amazon.awssdk.services.synthetics.model.CanaryState;
+import software.amazon.awssdk.services.synthetics.model.StartCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.StopCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.TagResourceRequest;
+import software.amazon.awssdk.services.synthetics.model.UntagResourceRequest;
+import software.amazon.awssdk.services.synthetics.model.UpdateCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.ValidationException;
+import software.amazon.awssdk.services.synthetics.model.VisualReferenceInput;
+import software.amazon.awssdk.services.synthetics.model.VpcConfigInput;
 import software.amazon.cloudformation.Action;
-import software.amazon.cloudformation.exceptions.*;
-import software.amazon.cloudformation.proxy.*;
+import software.amazon.cloudformation.exceptions.CfnGeneralServiceException;
+import software.amazon.cloudformation.exceptions.CfnInvalidRequestException;
+import software.amazon.cloudformation.proxy.HandlerErrorCode;
+import software.amazon.cloudformation.proxy.OperationStatus;
+import software.amazon.cloudformation.proxy.ProgressEvent;
+
 
 import java.util.Collections;
 import java.util.Map;
@@ -97,7 +115,7 @@ public class UpdateHandler extends CanaryActionHandler {
                     canary.status().stateReason());
         }
 
-        if (model.getStartCanaryAfterCreation()) {
+        if (model.getStartCanaryAfterCreation() != null && model.getStartCanaryAfterCreation()) {
             // There is a race condition here. We will get an exception if someone calls
             // DeleteCanary, StartCanary, or UpdateCanary before we call StartCanary.
 
@@ -117,7 +135,7 @@ public class UpdateHandler extends CanaryActionHandler {
         // If the customer calls StartCanary before we handle the canary in READY or
         // STOPPED state, then we can end up here even when StartCanaryAfterCreation is false.
 
-        if (model.getStartCanaryAfterCreation()) {
+        if (model.getStartCanaryAfterCreation() != null && model.getStartCanaryAfterCreation()) {
             return waitingForCanaryStateTransition(
                 "Starting canary",
                 "Canary is in state STARTING.",
@@ -147,7 +165,7 @@ public class UpdateHandler extends CanaryActionHandler {
 
             // If the canary was initially in state RUNNING and StartCanaryAfterCreation is
             // false, we should stop the canary.
-            if (!model.getStartCanaryAfterCreation()) {
+            if (model.getStartCanaryAfterCreation() == null || !model.getStartCanaryAfterCreation()) {
                 // There is a race condition here. We will get an exception if someone calls
                 // DeleteCanary, StopCanary, or UpdateCanary before we call StopCanary.
                 proxy.injectCredentialsAndInvokeV2(

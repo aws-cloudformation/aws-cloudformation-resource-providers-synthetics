@@ -1,12 +1,27 @@
 package com.amazon.synthetics.canary;
 
-import org.apache.commons.collections.map.SingletonMap;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import software.amazon.awssdk.services.synthetics.model.*;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import software.amazon.awssdk.services.synthetics.model.ArtifactConfigOutput;
+import software.amazon.awssdk.services.synthetics.model.Canary;
+import software.amazon.awssdk.services.synthetics.model.CanaryRunConfigOutput;
+import software.amazon.awssdk.services.synthetics.model.CanaryState;
+import software.amazon.awssdk.services.synthetics.model.CanaryStatus;
+import software.amazon.awssdk.services.synthetics.model.EncryptionMode;
+import software.amazon.awssdk.services.synthetics.model.GetCanaryResponse;
+import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
+import software.amazon.awssdk.services.synthetics.model.S3EncryptionConfig;
+import software.amazon.awssdk.services.synthetics.model.StartCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.StopCanaryRequest;
+import software.amazon.awssdk.services.synthetics.model.VisualReferenceOutput;
 import software.amazon.cloudformation.exceptions.CfnNotFoundException;
-import software.amazon.cloudformation.proxy.*;
+import software.amazon.cloudformation.proxy.HandlerErrorCode;
+import software.amazon.cloudformation.proxy.OperationStatus;
+import software.amazon.cloudformation.proxy.ProgressEvent;
+import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -121,6 +136,17 @@ public class UpdateHandlerTest extends TestBase {
 
     @ParameterizedTest
     @EnumSource(value = CanaryState.class, names = { "READY", "STOPPED" })
+    public void handleRequest_inProgress_canaryStateIsReadyOrStopped_startCanaryAfterCreationIsNull_returnsSuccess(CanaryState state) {
+        configureGetCanaryResponse(state);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+                proxy, REQUEST_NULL_START_CANARY, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getResourceModel()).isNotNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CanaryState.class, names = { "READY", "STOPPED" })
     public void handleRequest_inProgress_canaryStateIsReadyOrStopped_startCanaryAfterCreationIsTrue_returnsInProgress(CanaryState state) {
         configureGetCanaryResponse(state);
 
@@ -139,6 +165,17 @@ public class UpdateHandlerTest extends TestBase {
 
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
             proxy, REQUEST, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
+
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
+        assertThat(response.getResourceModel()).isNotNull();
+    }
+
+    @Test
+    public void handleRequest_inProgress_canaryStateIsStarting_startCanaryAfterCreationIsNull_returnsSuccess() {
+        configureGetCanaryResponse(CanaryState.STARTING);
+
+        ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+                proxy, REQUEST_NULL_START_CANARY, CallbackContext.builder().canaryUpdateStarted(true).build(), logger);
 
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
         assertThat(response.getResourceModel()).isNotNull();
@@ -168,13 +205,15 @@ public class UpdateHandlerTest extends TestBase {
         assertThat(response.getResourceModel()).isNotNull();
     }
 
-    @Test
-    public void handleRequest_inProgress_canaryStateIsRunning_initialStateIsRunning_startCanaryAfterCreationIsFalse_stopsCanary() {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = {false})
+    public void handleRequest_inProgress_canaryStateIsRunning_initialStateIsRunning_startCanaryAfterCreationIsFalseOrNull_stopsCanary(Boolean value) {
         configureGetCanaryResponse(CanaryState.RUNNING);
-
+        ResourceHandlerRequest<ResourceModel> request = value == null ? REQUEST_NULL_START_CANARY : REQUEST;
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
             proxy,
-            REQUEST,
+            request,
             CallbackContext.builder().canaryUpdateStarted(true).initialCanaryState(CanaryState.RUNNING).build(),
             logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -991,7 +1030,7 @@ public class UpdateHandlerTest extends TestBase {
     @Test
     public void handleRequest_updateArtifactEncryptionFromPresentToNull() {
         ResourceModel model = buildModel();
-
+        model.setArtifactConfig(null);
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
                 .desiredResourceState(model)
                 .build();

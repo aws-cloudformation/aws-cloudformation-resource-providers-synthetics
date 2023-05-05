@@ -109,6 +109,9 @@
                 },
                 "Handler": {
                     "type": "string"
+                },
+                "SourceLocationArn": {
+                    "type": "string"
                 }
             },
             "required": [
@@ -275,8 +278,7 @@
         "ArtifactS3Location",
         "ExecutionRoleArn",
         "Schedule",
-        "RuntimeVersion",
-        "StartCanaryAfterCreation"
+        "RuntimeVersion"
     ],
     "handlers": {
         "create": {
@@ -349,6 +351,13 @@
         "/properties/Code/S3Bucket",
         "/properties/Code/S3Key",
         "/properties/Code/S3ObjectVersion",
-        "/properties/Code/Script"
+        "/properties/Code/Script",
+        "/properties/DeleteLambdaResourcesOnCanaryDeletion",
+        "/properties/StartCanaryAfterCreation",
+        "/properties/RunConfig/EnvironmentVariables",
+        "/properties/VisualReference"
+    ],
+    "deprecatedProperties": [
+        "/properties/DeleteLambdaResourcesOnCanaryDeletion"
     ]
 }
