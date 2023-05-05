@@ -60,7 +60,7 @@ public class CreateHandler extends CanaryActionHandler {
 
     private ProgressEvent<ResourceModel, CallbackContext> handleCanaryInStateReady(Canary canary) {
         log("Canary is in state READY.");
-        if (model.getStartCanaryAfterCreation()) {
+        if (model.getStartCanaryAfterCreation() != null && model.getStartCanaryAfterCreation()) {
             // There is a race condition here. We will get an exception if someone calls
             // DeleteCanary, StartCanary, or UpdateCanary before we call StartCanary.
 
@@ -80,7 +80,7 @@ public class CreateHandler extends CanaryActionHandler {
         // If the customer calls StartCanary before we handle the canary in READY state,
         // then we can end up here even when StartCanaryAfterCreation is false.
 
-        if (model.getStartCanaryAfterCreation()) {
+        if (model.getStartCanaryAfterCreation() != null && model.getStartCanaryAfterCreation()) {
             return waitingForCanaryStateTransition(
                 "Starting canary",
                 "Canary is in state STARTING.",

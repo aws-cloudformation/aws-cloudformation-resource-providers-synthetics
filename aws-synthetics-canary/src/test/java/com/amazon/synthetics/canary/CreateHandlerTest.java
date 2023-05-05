@@ -1,18 +1,21 @@
 package com.amazon.synthetics.canary;
 
-import org.apache.commons.collections.map.SingletonMap;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.awssdk.services.synthetics.model.*;
-import software.amazon.cloudformation.proxy.*;
-
-import java.util.HashMap;
-import java.util.Map;
+import software.amazon.cloudformation.proxy.HandlerErrorCode;
+import software.amazon.cloudformation.proxy.OperationStatus;
+import software.amazon.cloudformation.proxy.ProgressEvent;
+import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
+
 
 public class CreateHandlerTest extends TestBase {
     private CreateHandler handler = new CreateHandler();
@@ -37,6 +40,7 @@ public class CreateHandlerTest extends TestBase {
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         assertThat(response.getMessage()).isNotNull();
         assertThat(response.getResourceModel()).isNotNull();
+        verify(proxy).injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any());
     }
 
     @Test
@@ -50,17 +54,21 @@ public class CreateHandlerTest extends TestBase {
         assertThat(response.getMessage()).isNotNull();
         assertThat(response.getResourceModel()).isNotNull();
         assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.GeneralServiceException);
+        verify(proxy).injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any());
     }
 
-    @Test
-    public void handleRequest_inProgress_canaryStateIsReady_startCanaryAfterCreationIsFalse_returnsSuccess() {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = {false})
+    public void handleRequest_inProgress_canaryStateIsReady_startCanaryAfterCreationIsFalseOrNull_returnsSuccess(Boolean startAfterCreate) {
         configureGetCanaryResponse(CanaryState.READY);
-
+        ResourceHandlerRequest<ResourceModel> request = startAfterCreate == null ? REQUEST_NULL_START_CANARY : REQUEST;
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
-            proxy, REQUEST, CallbackContext.builder().canaryCreateStarted(true).build(), logger);
+            proxy, request, CallbackContext.builder().canaryCreateStarted(true).build(), logger);
 
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
         assertThat(response.getResourceModel()).isNotNull();
+        verify(proxy).injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any());
     }
 
     @Test
@@ -74,18 +82,22 @@ public class CreateHandlerTest extends TestBase {
         assertThat(response.getMessage()).isNotNull();
         assertThat(response.getResourceModel()).isNotNull();
 
+        verify(proxy).injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any());
         verify(proxy).injectCredentialsAndInvokeV2(eq(StartCanaryRequest.builder().name(CANARY_NAME).build()), any());
     }
 
-    @Test
-    public void handleRequest_inProgress_canaryStateIsStarting_startCanaryAfterCreationIsFalse_returnsSuccess() {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = {false})
+    public void handleRequest_inProgress_canaryStateIsStarting_startCanaryAfterCreationIsFalseOrNull_returnsSuccess(Boolean value) {
         configureGetCanaryResponse(CanaryState.STARTING);
-
+        ResourceHandlerRequest<ResourceModel> request = value == null ? REQUEST_NULL_START_CANARY : REQUEST;
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
-            proxy, REQUEST, CallbackContext.builder().canaryCreateStarted(true).build(), logger);
+            proxy, request, CallbackContext.builder().canaryCreateStarted(true).build(), logger);
 
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
         assertThat(response.getResourceModel()).isNotNull();
+        verify(proxy).injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any());
     }
 
     @Test
@@ -98,14 +110,16 @@ public class CreateHandlerTest extends TestBase {
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         assertThat(response.getMessage()).isNotNull();
         assertThat(response.getResourceModel()).isNotNull();
+        verify(proxy).injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any());
     }
 
 
 
     @Test
     public void handleRequest_SimpleSuccess() {
+        ResourceModel model = buildModel(false);
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(buildModel())
+                .desiredResourceState(model)
                 .build();
 
         final CallbackContext callbackContext = CallbackContext.builder()
@@ -113,25 +127,20 @@ public class CreateHandlerTest extends TestBase {
                 .build();
 
         final Canary canary = Canary.builder()
-                .name("canarytestname")
+                .name(CANARY_NAME)
                 .code(codeOutputObjectForTesting())
                 .status(CanaryStatus.builder()
                         .state("RUNNING")
                         .build())
                 .schedule(canaryScheduleOutputForTesting())
-                .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).build())
                 .build();
-
         final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
                 .canary(canary)
                 .build();
 
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-
-        doReturn(getCanaryResponse,
-                tagResourceResponse)
+        doReturn(getCanaryResponse)
                 .when(proxy)
-                .injectCredentialsAndInvokeV2(any(), any());
+                .injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any());
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, callbackContext, logger);
 
@@ -139,16 +148,102 @@ public class CreateHandlerTest extends TestBase {
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
         assertThat(response.getCallbackContext()).isNull();
         assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModel().getState()).isEqualTo("RUNNING");
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();
         assertThat(response.getErrorCode()).isNull();
+        verify(proxy).injectCredentialsAndInvokeV2(eq(GetCanaryRequest.builder().name(CANARY_NAME).build()), any());
     }
 
     @Test
-    public void handleRequest_SimpleSuccessRemovingOptionalValues() {
+    public void handleRequest_createCanary_Basic() {
         ResourceModel model = buildModel(false);
+        ResourceModel modelClone = buildModel(false);
 
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        final Canary canary = Canary.builder()
+                .name(CANARY_NAME)
+                .build();
+
+        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
+                .canary(canary)
+                .build();
+        final CallbackContext inputContext = CallbackContext.builder().build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
+
+        doReturn(createCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(eq(buildCreateCanaryRequest(false, model)), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
+        assertThat(response.getResourceModel()).isEqualTo(modelClone);
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+        verify(proxy).injectCredentialsAndInvokeV2(eq(buildCreateCanaryRequest(false, model)), any());
+    }
+
+    @Test
+    public void handleRequest_createCanary_WithOptionals() {
+        ResourceModel model = buildModel(true);
+        ResourceModel modelClone = buildModel(true);
+
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+
+        final Canary canary = Canary.builder()
+                .name(CANARY_NAME)
+                .build();
+
+        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
+                .canary(canary)
+                .build();
+        final CallbackContext inputContext = CallbackContext.builder().build();
+        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
+
+        doReturn(createCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(eq(buildCreateCanaryRequest(true, model)), any());
+
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
+        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
+        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
+        assertThat(response.getResourceModel()).isEqualTo(modelClone);
+        assertThat(response.getResourceModels()).isNull();
+        assertThat(response.getMessage()).isNull();
+        assertThat(response.getErrorCode()).isNull();
+        verify(proxy).injectCredentialsAndInvokeV2(eq(buildCreateCanaryRequest(true, model)), any());
+    }
+
+    // need a separate test for this field because we can either supply code or s3 bucket with s3 key
+    @Test
+    public void handleRequest_createCanary_WithS3Bucket() {
+        ResourceModel model = buildModel(true);
+        ResourceModel modelClone = buildModel(true);
+        final Code code = new Code("s3bucket",
+                "s3Key",
+                null,
+                null,
+                "pageLoadBlueprint.handler",
+                null);
+        final Code codeClone = new Code("s3bucket",
+                "s3Key",
+                null,
+                null,
+                "pageLoadBlueprint.handler",
+                null);
+        model.setCode(code);
+        modelClone.setCode(codeClone);
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
                 .desiredResourceState(model)
                 .build();
@@ -159,30 +254,19 @@ public class CreateHandlerTest extends TestBase {
                 .activeTracing(false)
                 .build();
 
+        // does not matter what we return, as we ignore canary response
         final Canary canary = Canary.builder()
-                .name("canarytestname")
-                .code(codeOutputObjectForTesting())
-                .status(CanaryStatus.builder()
-                        .state("RUNNING")
-                        .build())
-                .schedule(canaryScheduleOutputForTesting())
-                .runConfig(outputExpected)
+                .name(CANARY_NAME)
                 .build();
 
         final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
                 .canary(canary)
                 .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
         final CallbackContext inputContext = CallbackContext.builder().build();
         final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
 
-        doReturn(createCanaryResponse,
-                getCanaryResponse,
-                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
+        doReturn(createCanaryResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(eq(buildCreateCanaryRequest(true, model)), any());
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
 
@@ -190,407 +274,11 @@ public class CreateHandlerTest extends TestBase {
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
         assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
+        assertThat(response.getResourceModel()).isEqualTo(modelClone);
         assertThat(response.getResourceModels()).isNull();
         assertThat(response.getMessage()).isNull();
         assertThat(response.getErrorCode()).isNull();
-        assertThat(response.getResourceModel().getRunConfig()).isNull();
-    }
-
-    @Test
-    public void handleRequest_createCanary_inProgress() {
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(buildModel())
-                .build();
-
-        final Canary canary = Canary.builder()
-                .name("canarytestname")
-                .code(codeOutputObjectForTesting())
-                .status(CanaryStatus.builder()
-                        .state("RUNNING")
-                        .build())
-                .schedule(canaryScheduleOutputForTesting())
-                .build();
-
-        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-        final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
-
-        doReturn(createCanaryResponse,
-                getCanaryResponse,
-                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
-
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-        assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getMessage()).isNull();
-        assertThat(response.getErrorCode()).isNull();
-    }
-
-    @Test
-    public void handleRequest_createCanary_withoutActiveTracing() {
-        ResourceModel model = buildModel();
-        RunConfig runConfig = new RunConfig();
-        runConfig.setTimeoutInSeconds(60);
-        runConfig.setMemoryInMB(1024);
-        model.setRunConfig(runConfig);
-
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(model)
-                .build();
-
-        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
-                .timeoutInSeconds(60)
-                .memoryInMB(1024)
-                .activeTracing(false)
-                .build();
-
-        final Canary canary = Canary.builder()
-                .name("canarytestname")
-                .code(codeOutputObjectForTesting())
-                .status(CanaryStatus.builder()
-                        .state("RUNNING")
-                        .build())
-                .schedule(canaryScheduleOutputForTesting())
-                .runConfig(outputExpected)
-                .build();
-
-        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-        final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
-
-        doReturn(createCanaryResponse,
-                getCanaryResponse,
-                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
-
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-        assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getMessage()).isNull();
-        assertThat(response.getErrorCode()).isNull();
-        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
-        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isNull();
-    }
-
-    @Test
-    public void handleRequest_createCanary_withActiveTracingTrue() {
-        ResourceModel model = buildModel();
-        RunConfig runConfig = new RunConfig();
-        runConfig.setTimeoutInSeconds(60);
-        runConfig.setMemoryInMB(1024);
-        runConfig.setActiveTracing(true);
-        model.setRunConfig(runConfig);
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(model)
-                .build();
-
-        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
-                .timeoutInSeconds(60)
-                .memoryInMB(1024)
-                .activeTracing(true)
-                .build();
-
-        final Canary canary = Canary.builder()
-                .name("canarytestname")
-                .code(codeOutputObjectForTesting())
-                .status(CanaryStatus.builder()
-                        .state("RUNNING")
-                        .build())
-                .schedule(canaryScheduleOutputForTesting())
-                .runConfig(outputExpected)
-                .build();
-
-        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-        final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
-
-        doReturn(createCanaryResponse,
-                getCanaryResponse,
-                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
-
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-        assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getMessage()).isNull();
-        assertThat(response.getErrorCode()).isNull();
-        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
-        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(true);
-    }
-
-    @Test
-    public void handleRequest_createCanary_withActiveTracingFalse() {
-        ResourceModel model = buildModel();
-        RunConfig runConfig = new RunConfig();
-        runConfig.setTimeoutInSeconds(60);
-        runConfig.setMemoryInMB(1024);
-        runConfig.setActiveTracing(false);
-        model.setRunConfig(runConfig);
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(model)
-                .build();
-
-        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
-                .timeoutInSeconds(60)
-                .memoryInMB(1024)
-                .activeTracing(false)
-                .build();
-
-        final Canary canary = Canary.builder()
-                .name("canarytestname")
-                .code(codeOutputObjectForTesting())
-                .status(CanaryStatus.builder()
-                        .state("RUNNING")
-                        .build())
-                .schedule(canaryScheduleOutputForTesting())
-                .runConfig(outputExpected)
-                .build();
-
-        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-        final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
-
-        doReturn(createCanaryResponse,
-                getCanaryResponse,
-                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
-
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-        assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getMessage()).isNull();
-        assertThat(response.getErrorCode()).isNull();
-        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
-        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
-    }
-
-    @Test
-    public void handleRequest_createCanary_withNoEnvironmentVariables() {
-        ResourceModel model = buildModel();
-        RunConfig runConfig = new RunConfig();
-        runConfig.setTimeoutInSeconds(60);
-        runConfig.setMemoryInMB(1024);
-        runConfig.setActiveTracing(false);
-        model.setRunConfig(runConfig);
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-            .desiredResourceState(model)
-            .build();
-
-        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
-            .timeoutInSeconds(60)
-            .memoryInMB(1024)
-            .activeTracing(false)
-            .build();
-
-        final Canary canary = Canary.builder()
-            .name("canarytestname")
-            .code(codeOutputObjectForTesting())
-            .status(CanaryStatus.builder()
-                .state("RUNNING")
-                .build())
-            .schedule(canaryScheduleOutputForTesting())
-            .runConfig(outputExpected)
-            .build();
-
-        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
-            .canary(canary)
-            .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-            .canary(canary)
-            .build();
-        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-        final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
-
-        doReturn(createCanaryResponse,
-            getCanaryResponse,
-            tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
-
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-        assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getMessage()).isNull();
-        assertThat(response.getErrorCode()).isNull();
-        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
-        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
-    }
-
-    @Test
-    public void handleRequest_createCanary_withEnvironmentVariables() {
-        ResourceModel model = buildModel();
-        Map<String, String> environmentVariablesMap = new HashMap<>();
-        environmentVariablesMap.put("env_key", "env_val");
-        RunConfig runConfig = new RunConfig();
-        runConfig.setTimeoutInSeconds(60);
-        runConfig.setMemoryInMB(1024);
-        runConfig.setActiveTracing(false);
-        runConfig.setEnvironmentVariables(environmentVariablesMap);
-        model.setRunConfig(runConfig);
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-            .desiredResourceState(model)
-            .build();
-
-        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
-            .timeoutInSeconds(60)
-            .memoryInMB(1024)
-            .activeTracing(false)
-            .build();
-
-        final Canary canary = Canary.builder()
-            .name("canarytestname")
-            .code(codeOutputObjectForTesting())
-            .status(CanaryStatus.builder()
-                .state("RUNNING")
-                .build())
-            .schedule(canaryScheduleOutputForTesting())
-            .runConfig(outputExpected)
-            .build();
-
-        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
-            .canary(canary)
-            .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-            .canary(canary)
-            .build();
-        // final TagResourceRequest tagResourceRequest = TagResourceRequest.builder().resourceArn("arn:aws:synthetics:us-west-1:440056434621:canary:canarytestname").tags(sampleTags()).build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-        final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
-
-        doReturn(createCanaryResponse,
-            getCanaryResponse,
-            tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
-
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-        assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getMessage()).isNull();
-        assertThat(response.getErrorCode()).isNull();
-        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
-        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
-    }
-
-    @Test
-    public void handleRequest_createCanary_withKmsEncryption() {
-        ResourceModel model = buildModel();
-
-        RunConfig runConfig = new RunConfig();
-        runConfig.setTimeoutInSeconds(60);
-        runConfig.setMemoryInMB(1024);
-        runConfig.setActiveTracing(false);
-        model.setRunConfig(runConfig);
-
-        final ArtifactConfig artifactConfig = new ArtifactConfig();
-        final S3Encryption s3Encryption = new S3Encryption();
-        s3Encryption.setEncryptionMode("SSE_KMS");
-        s3Encryption.setKmsKeyArn("arn:aws:kms:us-west-2:222222222222:key/kmskeyId");
-        artifactConfig.setS3Encryption(s3Encryption);
-        model.setArtifactConfig(artifactConfig);
-
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-                .desiredResourceState(model)
-                .build();
-
-        CanaryRunConfigOutput outputExpected = CanaryRunConfigOutput.builder()
-                .timeoutInSeconds(60)
-                .memoryInMB(1024)
-                .activeTracing(false)
-                .build();
-
-        final Canary canary = Canary.builder()
-                .name("canarytestname")
-                .code(codeOutputObjectForTesting())
-                .status(CanaryStatus.builder()
-                        .state("RUNNING")
-                        .build())
-                .schedule(canaryScheduleOutputForTesting())
-                .runConfig(outputExpected)
-                .build();
-
-        final CreateCanaryResponse createCanaryResponse = CreateCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        final GetCanaryResponse getCanaryResponse = GetCanaryResponse.builder()
-                .canary(canary)
-                .build();
-        final TagResourceResponse tagResourceResponse = TagResourceResponse.builder().build();
-        final CallbackContext inputContext = CallbackContext.builder().build();
-        final CallbackContext outputContext = CallbackContext.builder().canaryCreateStarted(true).build();
-
-        doReturn(createCanaryResponse,
-                getCanaryResponse,
-                tagResourceResponse).when(proxy).injectCredentialsAndInvokeV2(any(), any());
-
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
-        assertThat(response.getCallbackContext()).isEqualToComparingFieldByField(outputContext);
-        assertThat(response.getCallbackDelaySeconds()).isEqualTo(10);
-        assertThat(response.getResourceModel()).isEqualTo(request.getDesiredResourceState());
-        assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getMessage()).isNull();
-        assertThat(response.getErrorCode()).isNull();
-        assertThat(response.getResourceModel().getRunConfig().getTimeoutInSeconds()).isEqualTo(60);
-        assertThat(response.getResourceModel().getRunConfig().getActiveTracing()).isEqualTo(false);
-        assertThat(response.getResourceModel().getArtifactConfig().getS3Encryption().getEncryptionMode()).isEqualTo("SSE_KMS");
-        assertThat(response.getResourceModel().getArtifactConfig().getS3Encryption().getKmsKeyArn()).isEqualTo("arn:aws:kms:us-west-2:222222222222:key/kmskeyId");
+        verify(proxy).injectCredentialsAndInvokeV2(eq(buildCreateCanaryRequest(true, model)), any());
     }
 }
+

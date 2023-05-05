@@ -34,12 +34,11 @@ public class ModelHelper {
     // Python Runtime
     private static final String PYTHON_DIR = "/python/";
     private static final String PY_SUFFIX = ".py";
-    private static final String PYTHON_PATTERN = "^syn-python-*";
+    private static final String PYTHON_PATTERN = "^syn-python-.*";
     private static final Pattern python_pattern = Pattern.compile(PYTHON_PATTERN);
 
     public static ResourceModel constructModel(Canary canary, ResourceModel model) {
         Map<String, String> tags = canary.tags();
-
         model.setId(canary.id());
         model.setName(canary.name());
         model.setArtifactS3Location("s3://" + canary.artifactS3Location());
@@ -48,7 +47,6 @@ public class ModelHelper {
         model.setSuccessRetentionPeriod(canary.successRetentionPeriodInDays());
         model.setRuntimeVersion(canary.runtimeVersion());
         model.setState(canary.status().stateAsString());
-
         model.setCode(buildCodeObject(canary.code()));
         model.setSchedule(buildCanaryScheduleObject(canary.schedule()));
         // Tags are optional. Check for null
@@ -67,12 +65,23 @@ public class ModelHelper {
                 .build());
         }
 
+        if (!CanaryHelper.isNullOrEmpty(canary.artifactConfig())) {
+            model.setArtifactConfig(ArtifactConfig.builder()
+                    .s3Encryption(
+                            S3Encryption.builder()
+                                    .encryptionMode(canary.artifactConfig().s3Encryption().encryptionModeAsString())
+                                    .kmsKeyArn(canary.artifactConfig().s3Encryption().kmsKeyArn())
+                                    .build())
+                    .build());
+        }
+
         return model;
     }
 
     private static Code buildCodeObject(CanaryCodeOutput canaryCodeOutput) {
         return Code.builder()
                 .handler(canaryCodeOutput.handler())
+                .sourceLocationArn(canaryCodeOutput.sourceLocationArn())
                 .build();
     }
 
@@ -172,6 +181,7 @@ public class ModelHelper {
     public static Map<String, String> buildTagInputMap(ResourceModel model) {
         Map<String, String> tagMap = new HashMap<>();
         List<Tag> tagList = model.getTags();
+
         // return null if no Tag specified.
         if (tagList == null) return null;
 
