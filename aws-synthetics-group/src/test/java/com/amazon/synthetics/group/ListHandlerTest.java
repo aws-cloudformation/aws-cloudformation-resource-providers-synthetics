@@ -13,11 +13,9 @@ import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.any;
 
@@ -39,7 +37,7 @@ public class ListHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response =
-            handler.handleRequest(proxy, request, null, proxyClientMap, logger);
+            handler.handleRequest(proxy, request, null, proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
@@ -66,7 +64,7 @@ public class ListHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response =
-            handler.handleRequest(proxy, request, null, proxyClientMap, logger);
+            handler.handleRequest(proxy, request, null, proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.FAILED);

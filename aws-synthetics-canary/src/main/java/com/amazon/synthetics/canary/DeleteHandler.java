@@ -1,5 +1,8 @@
 package com.amazon.synthetics.canary;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.Action;
 import software.amazon.cloudformation.exceptions.CfnResourceConflictException;
@@ -7,6 +10,12 @@ import software.amazon.cloudformation.proxy.*;
 
 public class DeleteHandler extends CanaryActionHandler {
     private static final int MAX_RETRY_TIMES = 10;
+
+    private static final Set<CanaryStateReasonCode> UNSUCCESSFUL_DELETION_REASON_CODES = EnumSet.of(
+        CanaryStateReasonCode.ROLLBACK_COMPLETE,
+        CanaryStateReasonCode.ROLLBACK_FAILED,
+        CanaryStateReasonCode.DELETE_FAILED
+    );
 
     public DeleteHandler() {
         super(Action.DELETE);
@@ -91,11 +100,25 @@ public class DeleteHandler extends CanaryActionHandler {
     }
 
     private ProgressEvent<ResourceModel, CallbackContext> confirmCanaryDeleted() {
-        if (getCanaryOrNull() != null) {
-            String message = "Confirming that canary was deleted.";
-            return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "DELETING");
-        } else {
+        final Canary canary = getCanaryOrNull();
+        if (canary == null) {
             return ProgressEvent.defaultSuccessHandler(null);
+        } else {
+            final CanaryState state = canary.status().state();
+            final CanaryStateReasonCode stateReasonCode = canary.status().stateReasonCode();
+            if (UNSUCCESSFUL_DELETION_REASON_CODES.contains(stateReasonCode)) {
+                log(String.format("Canary in state %s failed to delete with reason code %s",
+                        state, stateReasonCode));
+                return ProgressEvent.failed(
+                        model,
+                        context,
+                        HandlerErrorCode.GeneralServiceException,
+                        canary.status().stateReason()
+                );
+            } else {
+                String message = "Confirming that canary was deleted.";
+                return waitingForCanaryStateTransition(message, MAX_RETRY_TIMES, "DELETING");
+            }
         }
     }
 }

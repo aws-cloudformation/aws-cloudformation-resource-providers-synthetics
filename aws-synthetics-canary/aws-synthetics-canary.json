@@ -6,7 +6,7 @@
         "Name": {
             "description": "Name of the canary.",
             "type": "string",
-            "pattern": "^[0-9a-z_\\-]{1,21}$"
+            "pattern": "^[0-9a-z_\\-]{1,255}$"
         },
         "Id": {
             "description": "Id of the canary",
@@ -75,6 +75,22 @@
         "DeleteLambdaResourcesOnCanaryDeletion": {
             "description": "Deletes associated lambda resources created by Synthetics if set to True. Default is False",
             "type": "boolean"
+        },
+        "ResourcesToReplicateTags": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "List of resources which canary tags should be replicated to.",
+            "items": {
+                "$ref": "#/definitions/ResourceToTag"
+            }
+        },
+        "ProvisionedResourceCleanup": {
+            "description": "Setting to control if provisioned resources created by Synthetics are deleted alongside the canary. Default is AUTOMATIC.",
+            "type": "string",
+            "enum": [
+                "AUTOMATIC",
+                "OFF"
+            ]
         }
     },
     "definitions" : {
@@ -270,6 +286,13 @@
                     "description": "KMS key Arn for encrypting artifacts when uploading to S3. You must specify KMS key Arn for SSE_KMS encryption mode only."
                 }
             }
+        },
+        "ResourceToTag": {
+            "type": "string",
+            "description": "Specifies which resources canary tags should be replicated to.",
+            "enum": [
+                "lambda-function"
+            ]
         }
     },
     "required": [
@@ -280,24 +303,32 @@
         "Schedule",
         "RuntimeVersion"
     ],
+    "tagging": {
+        "taggable": true
+    },
     "handlers": {
         "create": {
             "permissions": [
                 "synthetics:CreateCanary",
                 "synthetics:StartCanary",
+                "synthetics:GetCanary",
+                "synthetics:TagResource",
                 "s3:CreateBucket",
                 "s3:GetObject",
                 "s3:GetObjectVersion",
                 "s3:PutBucketEncryption",
                 "s3:PutEncryptionConfiguration",
+                "s3:GetBucketLocation",
                 "lambda:CreateFunction",
                 "lambda:AddPermission",
                 "lambda:PublishVersion",
+                "lambda:UpdateFunctionCode",
                 "lambda:UpdateFunctionConfiguration",
                 "lambda:GetFunctionConfiguration",
                 "lambda:GetLayerVersionByArn",
                 "lambda:GetLayerVersion",
                 "lambda:PublishLayerVersion",
+                "lambda:TagResource",
                 "ec2:DescribeVpcs",
                 "ec2:DescribeSubnets",
                 "ec2:DescribeSecurityGroups",
@@ -309,8 +340,26 @@
                 "synthetics:UpdateCanary",
                 "synthetics:StartCanary",
                 "synthetics:StopCanary",
+                "synthetics:GetCanary",
                 "synthetics:TagResource",
-                "synthetics:UntagResource"
+                "synthetics:UntagResource",
+                "s3:GetObject",
+                "s3:GetObjectVersion",
+                "s3:PutBucketEncryption",
+                "s3:PutEncryptionConfiguration",
+                "s3:GetBucketLocation",
+                "lambda:AddPermission",
+                "lambda:PublishVersion",
+                "lambda:UpdateFunctionCode",
+                "lambda:UpdateFunctionConfiguration",
+                "lambda:GetFunctionConfiguration",
+                "lambda:GetLayerVersionByArn",
+                "lambda:GetLayerVersion",
+                "lambda:PublishLayerVersion",
+                "lambda:ListTags",
+                "lambda:TagResource",
+                "lambda:UntagResource",
+                "iam:PassRole"
             ]
         },
         "read": {
@@ -326,7 +375,9 @@
         "delete": {
             "permissions": [
                 "synthetics:DeleteCanary",
-                "synthetics:GetCanary"
+                "synthetics:GetCanary",
+                "lambda:DeleteFunction",
+                "lambda:DeleteLayerVersion"
             ]
         },
         "list": {
@@ -354,6 +405,7 @@
         "/properties/Code/Script",
         "/properties/DeleteLambdaResourcesOnCanaryDeletion",
         "/properties/StartCanaryAfterCreation",
+        "/properties/ResourcesToReplicateTags",
         "/properties/RunConfig/EnvironmentVariables",
         "/properties/VisualReference"
     ],

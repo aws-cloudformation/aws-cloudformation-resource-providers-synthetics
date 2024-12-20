@@ -1,6 +1,7 @@
 package com.amazon.synthetics.canary;
 
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 
 import java.net.URI;
@@ -10,8 +11,16 @@ import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.cloudformation.LambdaWrapper;
 
 public class ClientBuilder {
-    public static SyntheticsClient getClient() {
-        return SyntheticsClient.builder().httpClient(LambdaWrapper.HTTP_CLIENT).build();
+    public static SyntheticsClient getSyntheticsClient() {
+        return SyntheticsClient.builder()
+                .httpClient(LambdaWrapper.HTTP_CLIENT)
+                .build();
+    }
+ 
+    public static LambdaClient getLambdaClient() {
+        return LambdaClient.builder()
+                .httpClient(LambdaWrapper.HTTP_CLIENT)
+                .build();
     }
 
     /**
@@ -22,7 +31,7 @@ public class ClientBuilder {
      * @param endpointOverride
      * @return
      */
-    static SyntheticsClient getClient(String region, String endpointOverride){
+    static SyntheticsClient getSyntheticsClient(String region, String endpointOverride){
         return SyntheticsClient
                 .builder()
                 .overrideConfiguration(

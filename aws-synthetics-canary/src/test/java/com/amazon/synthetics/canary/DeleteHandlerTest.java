@@ -3,7 +3,10 @@ package com.amazon.synthetics.canary;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+
+import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryState;
+import software.amazon.awssdk.services.synthetics.model.CanaryStateReasonCode;
 import software.amazon.awssdk.services.synthetics.model.ConflictException;
 import software.amazon.awssdk.services.synthetics.model.DeleteCanaryRequest;
 import software.amazon.awssdk.services.synthetics.model.ResourceNotFoundException;
@@ -234,5 +237,32 @@ public class DeleteHandlerTest extends TestBase {
 
         assertThatThrownBy(() -> handler.handleRequest(proxy, REQUEST, null, logger))
             .isInstanceOf(CfnNotFoundException.class);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = CanaryState.class, names = {"READY", "STOPPED", "ERROR"})
+    public void handleRequest_confirmCanaryDeleted_canaryRollbackOccurred_rollbackReasonInResponseMessage(CanaryState state) {
+        final CallbackContext context = CallbackContext.builder().canaryDeleteStarted(true).build();
+        final String stateReason = "User is not authorized to perform: lambda:DeleteFunction on resource";
+        final Canary canary = createCanaryWithState(state, stateReason, CanaryStateReasonCode.ROLLBACK_COMPLETE);
+        configureGetCanaryResponse(canary);
+ 
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+                proxy, REQUEST, context, logger);
+        assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.GeneralServiceException);
+        assertThat(response.getMessage()).isEqualTo(stateReason);
+    }
+ 
+    @Test
+    public void handleRequest_confirmCanaryDeleted_canaryDeleteFailed_reasonInResponseMessage() {
+        final CallbackContext context = CallbackContext.builder().canaryDeleteStarted(true).build();
+        final String stateReason = "User is not authorized to perform: lambda:DeleteLayerVersion on resource";
+        final Canary canary = createCanaryWithState(CanaryState.ERROR, stateReason, CanaryStateReasonCode.DELETE_FAILED);
+        configureGetCanaryResponse(canary);
+ 
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(
+                proxy, REQUEST, context, logger);
+        assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.GeneralServiceException);
+        assertThat(response.getMessage()).isEqualTo(stateReason);
     }
 }

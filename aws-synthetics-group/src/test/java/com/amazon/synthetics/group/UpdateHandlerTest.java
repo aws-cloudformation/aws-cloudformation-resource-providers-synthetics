@@ -11,14 +11,9 @@ import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 
@@ -42,7 +37,7 @@ public class UpdateHandlerTest extends AbstractTestBase {
             .desiredResourceState(model)
             .build();
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClientMap, logger);
+            createFirstCallBackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
         assertThat(response.getCallbackContext().getAddResourceList().isEmpty());
@@ -53,7 +48,7 @@ public class UpdateHandlerTest extends AbstractTestBase {
         assertThat(response.getErrorCode()).isNull();
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClientMap, logger);
+            response.getCallbackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 
@@ -77,7 +72,7 @@ public class UpdateHandlerTest extends AbstractTestBase {
             .desiredResourceState(model)
             .build();
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClientMap, logger);
+            createFirstCallBackContext(), proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -89,11 +84,11 @@ public class UpdateHandlerTest extends AbstractTestBase {
         assertThat(response.getErrorCode()).isNull();
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClientMap, logger);
+            response.getCallbackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClientMap, logger);
+            response.getCallbackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 
@@ -118,7 +113,7 @@ public class UpdateHandlerTest extends AbstractTestBase {
             .build();
 
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClientMap, logger);
+            createFirstCallBackContext(), proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -130,11 +125,11 @@ public class UpdateHandlerTest extends AbstractTestBase {
         assertThat(response.getErrorCode()).isNull();
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClientMap, logger);
+            response.getCallbackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClientMap, logger);
+            response.getCallbackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 
@@ -162,7 +157,7 @@ public class UpdateHandlerTest extends AbstractTestBase {
             .build();
 
         ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClientMap, logger);
+            createFirstCallBackContext(), proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -175,18 +170,18 @@ public class UpdateHandlerTest extends AbstractTestBase {
         assertThat(response.getErrorCode()).isNull();
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClientMap, logger);
+            response.getCallbackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response.getCallbackContext().getAddResourceList().isEmpty());
         assertThat(response.getCallbackContext().getRemoveResourceList().size()).isEqualTo(1);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClientMap, logger);
+            response.getCallbackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response.getCallbackContext().getRemoveResourceList().isEmpty());
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
 
         response = handler.handleRequest(proxy, request,
-            response.getCallbackContext(), proxyClientMap, logger);
+            response.getCallbackContext(), proxyClientMap, proxyClient, logger);
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
     }
 }

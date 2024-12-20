@@ -1,5 +1,6 @@
 package com.amazon.synthetics.canary;
 
+import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.synthetics.SyntheticsClient;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.cloudformation.Action;
@@ -18,6 +19,7 @@ public abstract class CanaryActionHandler extends BaseHandler<CallbackContext> {
     protected CallbackContext context;
     protected ResourceModel model;
     protected SyntheticsClient syntheticsClient;
+    protected LambdaClient lambdaClient;
 
     public CanaryActionHandler(Action action) {
         this.action = action;
@@ -33,7 +35,8 @@ public abstract class CanaryActionHandler extends BaseHandler<CallbackContext> {
         this.context = callbackContext != null ? callbackContext : CallbackContext.builder().build();
         this.model = request.getDesiredResourceState();
         this.logger = new ActionLogger(logger, action, request.getAwsAccountId(), context, model);
-        this.syntheticsClient = ClientBuilder.getClient();
+        this.syntheticsClient = ClientBuilder.getSyntheticsClient();
+        this.lambdaClient = ClientBuilder.getLambdaClient();
 
         log("Invoking handler");
         ProgressEvent<ResourceModel, CallbackContext> response;

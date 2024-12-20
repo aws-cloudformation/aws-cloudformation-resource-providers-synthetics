@@ -146,56 +146,64 @@ public class TagHelper {
     public static Map<String, Map<String, String>> updateTags(ResourceModel model, Map<String, String> existingTags) {
         Map<String, String> modelTagMap = new HashMap<>();
         List<Tag> modelTagList = model.getTags();
-        Set<Map.Entry<String, String>> modelTagsES = null;
-        Set<Map.Entry<String, String>> groupTags = null;
-        Set<Map.Entry<String, String>> modelTagsCopyES = null;
         Map<String, Map<String, String>> store = new HashMap<String, Map<String, String>>();
-        Map<String, String> copyExistingTags = new HashMap<>(existingTags);
+        Map<String, String> tagsToAdd = new HashMap<>();
+        Map<String, String> tagsToRemove = new HashMap<>();
 
-        if (modelTagList != null) {
+        if (modelTagList == null || modelTagList.isEmpty()) {
+            return null;
+        } else {
             for (Tag tag : modelTagList) {
                 modelTagMap.put(tag.getKey(), tag.getValue());
             }
-            modelTagsES = modelTagMap.entrySet();
-            modelTagsCopyES = new HashSet<Map.Entry<String, String>>(modelTagMap.entrySet());
         }
 
-        groupTags = copyExistingTags.entrySet();
-
-        if (modelTagList == null) {
-            return null;
-        }
-        Set<Map.Entry<String, String>> finalGroupTags = groupTags;
-        // Get an iterator
-        Iterator<Map.Entry<String, String>> modelIterator = modelTagsES.iterator();
-        while (modelIterator.hasNext()) {
-            Map.Entry<String, String> modelEntry = modelIterator.next();
-            if (finalGroupTags.contains(modelEntry)) {
-                modelIterator.remove();
-            }
-        }
-        // Store all the tags that need to be added to the group
-        store.put(Constants.ADD_TAGS, modelTagMap);
-
-        Iterator<Map.Entry<String, String>> groupTagIterator = finalGroupTags.iterator();
-        while (groupTagIterator.hasNext()) {
-            Map.Entry<String, String> canaryEntry = groupTagIterator.next();
+        /**
+         *  The following code sweeps through the modelTagMap for:
+         *  1. key/value pairs not to modify on at all
+         *     a. keys that contain "aws:" as those are reserved for AWS use
+         *     b. key/value pairs that already exist on the set of tags
+         *  2. key/value pairs to update on the new set of tags
+         *  3. key/value pairs to add to the new set of tags
+         * 
+         *  Then it performs a second sweep over existingTags for:
+         *  1. key/value pairs that aren't on the new modelTagMap so we can remove them
+         */
+        modelTagMap.forEach((modelKey, modelValue) -> {
             try {
-                if (modelTagsCopyES.contains(canaryEntry)) {
-                    groupTagIterator.remove();
+                if ((modelKey.startsWith("aws:")) ||
+                    (existingTags.containsKey(modelKey) && modelValue.equals(existingTags.get(modelKey)))) {
+                        /**
+                         * Do nothing; we just want to make sure nothing is done when these conditions are met:
+                         * 1. key starts with "aws:" since 
+                         * 2. key/value pair will persist in the new set of tags
+                         */
                 }
-                if (canaryEntry.getKey().toString().startsWith("aws:")) {
-                    groupTagIterator.remove();
+                else if (existingTags.containsKey(modelKey) && !modelValue.equals(existingTags.get(modelKey))) {
+                    tagsToAdd.put(modelKey, modelValue);
+                    tagsToRemove.put(modelKey, existingTags.get(modelKey));
                 }
-                if (!modelTagMap.isEmpty() && modelTagMap.containsKey(canaryEntry.getKey())) {
-                    groupTagIterator.remove();
+                else if (!existingTags.containsKey(modelKey)) {
+                    tagsToAdd.put(modelKey, modelValue);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }
-        // Store all the tags that need to be removed from the group
-        store.put(Constants.REMOVE_TAGS, copyExistingTags);
+        });
+ 
+        // Sweep through the existingTags to make sure we're removing any tags being deleted
+        existingTags.forEach((existingKey, existingValue) -> {
+            try {
+                if (!modelTagMap.containsKey(existingKey)) {
+                    tagsToRemove.put(existingKey, existingValue);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+ 
+        store.put(Constants.ADD_TAGS, tagsToAdd);
+        store.put(Constants.REMOVE_TAGS, tagsToRemove);
         return store;
     }
 

@@ -30,7 +30,7 @@ public class ReadHandlerTest extends TestBase {
         ResourceModel outputModel = buildModelForRead(true, useDefaultS3Encryption);
 
         final ProgressEvent<ResourceModel, CallbackContext> response
-            = handler.handleRequest(proxy, buildResourceHandlerRequestWithName(CANARY_NAME), null, logger);
+            = handler.handleRequest(proxy, buildResourceHandlerRequestWithTagReplication(CANARY_NAME), null, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
@@ -80,7 +80,7 @@ public class ReadHandlerTest extends TestBase {
         // if we throw ResourceNotFoundException when getting canary, that error gets caught and CfnNotFoundException is thrown.
         configureGetCanaryResponse(ResourceNotFoundException.builder().build());
 
-        assertThatThrownBy(() -> handler.handleRequest(proxy, buildResourceHandlerRequestWithName(CANARY_NAME), null, logger))
+        assertThatThrownBy(() -> handler.handleRequest(proxy, buildResourceHandlerRequestWithTagReplication(CANARY_NAME), null, logger))
                 .isInstanceOf(CfnNotFoundException.class);
 
         verify(proxy).injectCredentialsAndInvokeV2(

@@ -42,7 +42,7 @@ public class CreateHandlerTest extends AbstractTestBase {
             .desiredResourceState(model)
             .build();
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, createFirstCallBackContext(), proxyClientMap,
-            logger);
+            proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
@@ -72,7 +72,7 @@ public class CreateHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClientMap, logger);
+            createFirstCallBackContext(), proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -100,7 +100,7 @@ public class CreateHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            CallbackContext.builder().groupCreationStarted(true).build(), proxyClientMap, logger);
+            CallbackContext.builder().groupCreationStarted(true).build(), proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -130,7 +130,7 @@ public class CreateHandlerTest extends AbstractTestBase {
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
             CallbackContext.builder().groupCreationStarted(true).groupAssociationStarted(true)
-                .addResourceListIndex(2).build(), proxyClientMap, logger);
+                .addResourceListIndex(2).build(), proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -157,7 +157,7 @@ public class CreateHandlerTest extends AbstractTestBase {
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
             CallbackContext.builder().groupCreationStarted(true).groupAssociationStarted(true)
-                .addResourceListIndex(model.getResourceArns().size()).build(), proxyClientMap, logger);
+                .addResourceListIndex(model.getResourceArns().size()).build(), proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
@@ -185,7 +185,7 @@ public class CreateHandlerTest extends AbstractTestBase {
             .build();
 
         final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request,
-            CallbackContext.builder().groupCreationStarted(true).build(), proxyClientMap, logger);
+            CallbackContext.builder().groupCreationStarted(true).build(), proxyClientMap, proxyClient, logger);
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.IN_PROGRESS);
@@ -213,6 +213,6 @@ public class CreateHandlerTest extends AbstractTestBase {
             .thenThrow(ConflictException.builder().message("already exists").build());
 
         assertThrows(CfnAlreadyExistsException.class, () -> handler.handleRequest(proxy, request,
-            createFirstCallBackContext(), proxyClientMap, logger));
+            createFirstCallBackContext(), proxyClientMap, proxyClient, logger));
     }
 }

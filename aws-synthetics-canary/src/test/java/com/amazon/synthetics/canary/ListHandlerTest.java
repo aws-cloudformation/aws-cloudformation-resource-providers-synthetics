@@ -58,8 +58,8 @@ public class ListHandlerTest extends TestBase {
                 .build();
 
         final List<Canary> canaryList = new ArrayList<Canary>();
-        Canary canary1 = canaryResponseObjectForTesting("1-canary-cfn-unit", false);
-        Canary canary2 = canaryResponseObjectForTesting("2-canary-cfn-unit", false);
+        Canary canary1 = canaryResponseObjectForTesting("1-canary-cfn-unit", false, false);
+        Canary canary2 = canaryResponseObjectForTesting("2-canary-cfn-unit", false, false);
 
         canaryList.add(canary1);
         canaryList.add(canary2);
