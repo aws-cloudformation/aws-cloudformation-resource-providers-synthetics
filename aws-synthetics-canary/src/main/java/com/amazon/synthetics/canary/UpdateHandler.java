@@ -1,14 +1,20 @@
 package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
+
+import java.util.HashMap;
 import java.util.Objects;
 
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
+import software.amazon.awssdk.services.lambda.model.ListTagsRequest;
+import software.amazon.awssdk.services.lambda.model.ListTagsResponse;
 import software.amazon.awssdk.services.synthetics.model.ArtifactConfigInput;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeInput;
 import software.amazon.awssdk.services.synthetics.model.CanaryRunConfigInput;
 import software.amazon.awssdk.services.synthetics.model.CanaryScheduleInput;
 import software.amazon.awssdk.services.synthetics.model.CanaryState;
+import software.amazon.awssdk.services.synthetics.model.ResourceToTag;
 import software.amazon.awssdk.services.synthetics.model.StartCanaryRequest;
 import software.amazon.awssdk.services.synthetics.model.StopCanaryRequest;
 import software.amazon.awssdk.services.synthetics.model.TagResourceRequest;
@@ -196,6 +202,7 @@ public class UpdateHandler extends CanaryActionHandler {
         VpcConfigInput vpcConfigInput = null;
         VisualReferenceInput visualReferenceInput = null;
         ArtifactConfigInput artifactConfigInput = null;
+        String provisionedResourceCleanupSetting = canary.provisionedResourceCleanupAsString();
 
         if (!Objects.equals(handlerName, model.getCode().getHandler())) {
             log("Updating handler");
@@ -274,6 +281,11 @@ public class UpdateHandler extends CanaryActionHandler {
             artifactS3Location = model.getArtifactS3Location();
         }
 
+        if (ModelHelper.provisionedResourceCleanupSettingHasUpdate(canary, model)) {
+            log("Updating ProvisionedResourceCleanup");
+            provisionedResourceCleanupSetting = ModelHelper.getProvisionedResourceCleanupSetting(model);
+        }
+
         final CanaryCodeInput canaryCodeInput = CanaryCodeInput.builder()
                 .handler(handlerName)
                 .s3Bucket(model.getCode().getS3Bucket())
@@ -306,28 +318,118 @@ public class UpdateHandler extends CanaryActionHandler {
                 .vpcConfig(vpcConfigInput)
                 .artifactConfig(ModelHelper.getArtifactConfigInput(model.getArtifactConfig()))
                 .visualReference(visualReferenceInput)
+                .provisionedResourceCleanup(provisionedResourceCleanupSetting)
                 .build();
 
+        // Build diff of tags between existing canary tags and new tags to apply to canary
+        Map<String, Map<String, String>> canaryTagDiff = ModelHelper.buildTagDiff(model.getTags(), canary.tags());
+ 
+        Map<String, Map<String, String>> lambdaTagDiff = Map.of(
+                ADD_TAGS, new HashMap<>(),
+                REMOVE_TAGS, new HashMap<>()
+        );
+        String lambdaArn = canary.engineArn().substring(0, canary.engineArn().lastIndexOf(":"));
+        boolean replicateLambdaTags = model.getResourcesToReplicateTags() != null && model.getResourcesToReplicateTags().contains(ResourceToTag.LAMBDA_FUNCTION.toString());
+ 
+        // Get list of current tags applied to Lambda function
+        if (replicateLambdaTags) {
+            try {
+                log("Retrieving list of existing Lambda tags");
+                ListTagsRequest listTagsRequest = ListTagsRequest
+                        .builder()
+                        .resource(lambdaArn)
+                        .build();
+ 
+                ListTagsResponse listTagsResponse = proxy.injectCredentialsAndInvokeV2(listTagsRequest, lambdaClient::listTags);
+                Map<String, String> previousLambdaTags = listTagsResponse.tags();
+ 
+                // Build diff of tags between existing Lambda function tags and new tags to apply to Lambda function
+                lambdaTagDiff = ModelHelper.buildTagDiff(model.getTags(), previousLambdaTags);
+            } catch (final AwsServiceException e) {
+                if (ModelHelper.isMissingTaggingPermissionsError(e)) {
+                    log(String.format("Failed to retrieve existing Lambda tags: %s", e.getMessage()));
+                    return ProgressEvent.<ResourceModel, CallbackContext>failed(
+                            model,
+                            context,
+                            HandlerErrorCode.UnauthorizedTaggingOperation,
+                            e.getMessage()
+                    );
+                }
+ 
+                throw e;
+            }
+ 
+            log("Successfully retrieved existing Lambda tags");
+        }
         try {
             proxy.injectCredentialsAndInvokeV2(updateCanaryRequest, syntheticsClient::updateCanary);
-            // if tags need to be updated then we need to call TagResourceRequest
-            if (model.getTags() != null) {
-                Map<String, Map<String, String>> tagResourceMap = ModelHelper.updateTags(model, canary.tags());
-                if (!tagResourceMap.get(ADD_TAGS).isEmpty()) {
+            try {
+                Map<String, String> canaryAddTags = canaryTagDiff.get(ADD_TAGS);
+                Map<String, String> canaryRemoveTags = canaryTagDiff.get(REMOVE_TAGS);
+                Map<String, String> lambdaAddTags = lambdaTagDiff.get(ADD_TAGS);
+                Map<String, String> lambdaRemoveTags = lambdaTagDiff.get(REMOVE_TAGS);
+ 
+                // Add/update tag names/values on canary if necessary
+                if (!canaryAddTags.isEmpty()) {
+                    int modifiedCanaryTagsCount = canaryAddTags.size();
+                    log(String.format("Adding/updating %s canary tags", modifiedCanaryTagsCount));
                     TagResourceRequest tagResourceRequest = TagResourceRequest.builder()
                             .resourceArn(ModelHelper.buildCanaryArn(request, model.getName()))
-                            .tags(tagResourceMap.get(ADD_TAGS))
+                            .tags(canaryAddTags)
                             .build();
                     proxy.injectCredentialsAndInvokeV2(tagResourceRequest, syntheticsClient::tagResource);
+                    log(String.format("Successfully added/updated %s canary tags", modifiedCanaryTagsCount));
                 }
 
-                if (!tagResourceMap.get(REMOVE_TAGS).isEmpty()) {
+                // Add/update tag names/values on Lambda function if necessary
+                if (replicateLambdaTags && !lambdaAddTags.isEmpty()) {
+                    int modifiedLambdaTagsCount = lambdaAddTags.size();
+                    log(String.format("Adding/updating %s Lambda tags", modifiedLambdaTagsCount));
+                    software.amazon.awssdk.services.lambda.model.TagResourceRequest lambdaTagResourceRequest = software.amazon.awssdk.services.lambda.model.TagResourceRequest.builder()
+                            .resource(lambdaArn)
+                            .tags(lambdaAddTags)
+                            .build();
+ 
+                    proxy.injectCredentialsAndInvokeV2(lambdaTagResourceRequest, lambdaClient::tagResource);
+                    log(String.format("Successfully added/updated %s Lambda tags", modifiedLambdaTagsCount));
+                }
+ 
+                // Remove tags on canary if necessary
+                if (!canaryRemoveTags.isEmpty()) {
+                    int removedCanaryTagsCount = canaryRemoveTags.size();
+                    log(String.format("Removing %s canary tags", removedCanaryTagsCount));
                     UntagResourceRequest untagResourceRequest = UntagResourceRequest.builder()
                             .resourceArn(ModelHelper.buildCanaryArn(request, model.getName()))
-                            .tagKeys(tagResourceMap.get(REMOVE_TAGS).keySet())
+                            .tagKeys(canaryRemoveTags.keySet())
                             .build();
                     proxy.injectCredentialsAndInvokeV2(untagResourceRequest, syntheticsClient::untagResource);
+                    log(String.format("Successfully removed %s canary tags", removedCanaryTagsCount));
                 }
+
+                // Remove tags on Lambda function if necessary
+                if (replicateLambdaTags && !lambdaRemoveTags.isEmpty()) {
+                    int removedLambdaTagsCount = lambdaRemoveTags.size();
+                    log(String.format("Removing %s Lambda tags", removedLambdaTagsCount));
+                    software.amazon.awssdk.services.lambda.model.UntagResourceRequest lambdaUntagResourceRequest = software.amazon.awssdk.services.lambda.model.UntagResourceRequest.builder()
+                            .resource(lambdaArn)
+                            .tagKeys(lambdaRemoveTags.keySet())
+                            .build();
+ 
+                    proxy.injectCredentialsAndInvokeV2(lambdaUntagResourceRequest, lambdaClient::untagResource);
+                    log(String.format("Successfully removed %s Lambda tags", removedLambdaTagsCount));
+                }
+            } catch (final AwsServiceException e) {
+                if (ModelHelper.isMissingTaggingPermissionsError(e)) {
+                    log(String.format("Failed to modify tags on canary/Lambda during update: %s", e.getMessage()));
+                    return ProgressEvent.<ResourceModel, CallbackContext>failed(
+                            model,
+                            context,
+                            HandlerErrorCode.UnauthorizedTaggingOperation,
+                            e.getMessage()
+                    );
+                }
+ 
+                throw e;
             }
         }
         catch (final ValidationException e) {

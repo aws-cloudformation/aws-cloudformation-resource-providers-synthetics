@@ -3,7 +3,6 @@ package com.amazon.synthetics.group;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import java.util.List;
-import javafx.beans.property.adapter.JavaBeanBooleanPropertyBuilder;
 import lombok.Builder;
 import lombok.Data;
 import software.amazon.cloudformation.proxy.StdCallbackContext;

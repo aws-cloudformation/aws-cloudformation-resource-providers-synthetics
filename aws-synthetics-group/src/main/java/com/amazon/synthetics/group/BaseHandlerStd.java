@@ -31,18 +31,7 @@ import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
  * Base class for the functionality that could be shared across Create/Read/Update/Delete/List Handlers
   */
 public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
-  //Adding default region for testing purposes
-  protected Region region = Region.US_WEST_2;
   private final Action action;
-  private GroupLogger logger;
-
-  protected AmazonWebServicesClientProxy webServiceProxy;
-  protected ResourceHandlerRequest<ResourceModel> request;
-  protected CallbackContext callbackContext;
-  protected ResourceModel model;
-  protected ProxyClient<SyntheticsClient> proxyClient;
-  // This is to handle making multiregion calls for associate resource and dissociate resource
-  protected Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap;
 
   public BaseHandlerStd(Action action) {
     this.action = action;
@@ -55,9 +44,16 @@ public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
       final CallbackContext callbackContext,
       final Logger logger
   ) {
-    region = request.getRegion()!= null ? Region.of(request.getRegion()) : Region.US_WEST_2;
-    proxyClientMap = ClientBuilder.getClientMap(proxy);
-    return handleRequest(proxy, request, callbackContext, proxyClientMap, logger);
+    Region region = request.getRegion() != null ? Region.of(request.getRegion()) : Region.US_WEST_2;
+    Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap = ClientBuilder.getClientMap(proxy);
+    ProxyClient<SyntheticsClient> proxyClient = proxyClientMap.get(region);
+    return handleRequest(
+        proxy, 
+        request, 
+        callbackContext != null ? callbackContext : CallbackContext.builder().build(), 
+        proxyClientMap,
+        proxyClient, 
+        logger);
   }
 
   /**
@@ -69,57 +65,34 @@ public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
    * @param logger
    * @return
    */
-  protected ProgressEvent<ResourceModel, CallbackContext> handleRequest(
-      final AmazonWebServicesClientProxy proxy,
-      final ResourceHandlerRequest<ResourceModel> request,
-      final CallbackContext callbackContext,
-      final Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap,
-      final Logger logger) {
-    this.webServiceProxy = proxy;
-    this.request = request;
-    this.callbackContext = callbackContext != null ? callbackContext : CallbackContext.builder().build();
-    this.model = request.getDesiredResourceState();
-    this.logger = new GroupLogger(logger, action, request.getAwsAccountId(), callbackContext, model);
-    this.proxyClientMap = proxyClientMap;
-    this.proxyClient = proxyClientMap.get(region);
-
-    log(Constants.INVOKING_HANDLER_MSG);
-    ProgressEvent<ResourceModel, CallbackContext> response;
-    try {
-      response = handleRequest();
-    } catch (Exception e) {
-      log(e);
-      throw e;
-    }
-    log(Constants.INVOKING_HANDLER_FINISHED_MSG);
-    return response;
-
-  }
 
   /**
    * Overridden in every handler based on the action
    * @return
    */
-  protected abstract ProgressEvent<ResourceModel, CallbackContext> handleRequest();
-
-  protected void log(String message) {
-    logger.log(message);
-  }
-
-  protected void log(Exception exception) {
-    logger.log(exception);
-  }
+  protected abstract ProgressEvent<ResourceModel, CallbackContext> handleRequest(
+      final AmazonWebServicesClientProxy proxy,
+      final ResourceHandlerRequest<ResourceModel> request,
+      final CallbackContext callbackContext,
+      final Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap,
+      final ProxyClient<SyntheticsClient> proxyClient,
+      final Logger logger
+  );
 
   /**
    * Wrapper to call getGroup with Synthetics client and handle
    * the response/ error
    * @return Group
    */
-  protected Group getGroupOrThrow() {
+  protected Group getGroupOrThrow(
+        AmazonWebServicesClientProxy proxy, 
+        ProxyClient<SyntheticsClient> proxyClient,
+        ResourceModel model,
+        Logger logger) {
     try {
-      log(Constants.GET_GROUP_CALL);
+      logger.log(Constants.GET_GROUP_CALL);
       GetGroupRequest getGroupRequest = com.amazon.synthetics.group.Translator.translateToReadRequest(model);
-      GetGroupResponse getGroupResponse = webServiceProxy.injectCredentialsAndInvokeV2(getGroupRequest,
+      GetGroupResponse getGroupResponse = proxy.injectCredentialsAndInvokeV2(getGroupRequest,
           proxyClient.client()::getGroup);
       return getGroupResponse.group();
     } catch (final ValidationException e) {
@@ -135,13 +108,17 @@ public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
    * Wrapper to call getGroupResources api with Synthetics client and handle the response/error
    * @return List</String>: List of resource arns associated with the group
    */
-  protected List<String> getGroupResourcesOrThrow() {
+  protected List<String> getGroupResourcesOrThrow(
+      AmazonWebServicesClientProxy proxy, 
+      ProxyClient<SyntheticsClient> proxyClient,
+      ResourceModel model,
+      Logger logger) {
     try {
-      log(Constants.LIST_GROUP_RESOURCES_CALL);
+      logger.log(Constants.LIST_GROUP_RESOURCES_CALL);
       ListGroupResourcesRequest listGroupResourcesRequest = ListGroupResourcesRequest.builder()
           .groupIdentifier(model.getName())
           .build();
-      ListGroupResourcesResponse listGroupResourcesResponse = webServiceProxy.injectCredentialsAndInvokeV2(listGroupResourcesRequest,
+      ListGroupResourcesResponse listGroupResourcesResponse = proxy.injectCredentialsAndInvokeV2(listGroupResourcesRequest,
           proxyClient.client()::listGroupResources);
       return listGroupResourcesResponse.resources();
     } catch (final ValidationException e) {
@@ -157,17 +134,22 @@ public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
    * Wrapper around associateResource call to Synthetics client and handle the response/error
    * @param canaryArn: ResourceArn
    */
-  protected void addAssociatedResource(String canaryArn) {
+  protected void addAssociatedResource(
+        String canaryArn, 
+        AmazonWebServicesClientProxy proxy, 
+        Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap,
+        ResourceModel model,
+        Logger logger) {
     // Translate resource model to create group request
     // call associate resource request
-    log(Constants.MAKING_ADD_ASSOCIATE);
+    logger.log(Constants.MAKING_ADD_ASSOCIATE);
     try {
       Arn resourceArn = Arn.fromString(canaryArn);
       AssociateResourceRequest associateResourceRequest = AssociateResourceRequest.builder()
           .resourceArn(canaryArn)
           .groupIdentifier(model.getName())
           .build();
-      webServiceProxy.injectCredentialsAndInvokeV2(associateResourceRequest,
+      proxy.injectCredentialsAndInvokeV2(associateResourceRequest,
           proxyClientMap.get(Region.of(resourceArn.getRegion())).client()::associateResource);
     } catch (final ValidationException e) {
       throw new CfnInvalidRequestException(e.getMessage());
@@ -182,15 +164,20 @@ public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
    * Wrapper around associateResource call to Synthetics client and handle the response/error
    * @param canaryArn: ResourceArn
    */
-  protected void removeAssociatedResource(String canaryArn) {
-    log(Constants.MAKING_REMOVE_ASSOCIATE);
+  protected void removeAssociatedResource(
+        String canaryArn, 
+        AmazonWebServicesClientProxy proxy, 
+        Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap,
+        ResourceModel model,
+        Logger logger) {
+    logger.log(Constants.MAKING_REMOVE_ASSOCIATE);
     try {
       Arn resourceArn = Arn.fromString(canaryArn);
       DisassociateResourceRequest disassociateResourceRequest = DisassociateResourceRequest.builder()
           .groupIdentifier(model.getName())
           .resourceArn(canaryArn)
           .build();
-      webServiceProxy.injectCredentialsAndInvokeV2(disassociateResourceRequest, proxyClientMap.get(Region.of(resourceArn.getRegion())).client()::disassociateResource);
+      proxy.injectCredentialsAndInvokeV2(disassociateResourceRequest, proxyClientMap.get(Region.of(resourceArn.getRegion())).client()::disassociateResource);
     } catch (final ValidationException e) {
       throw new CfnInvalidRequestException(e.getMessage());
     } catch (ResourceNotFoundException e) {
@@ -207,12 +194,18 @@ public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
    *                           for create this is false
    * @return send back an in progress event
    */
-  protected ProgressEvent<ResourceModel, CallbackContext> addAssociatedResources(boolean useResourceDiffList) {
+  protected ProgressEvent<ResourceModel, CallbackContext> addAssociatedResources(
+      boolean useResourceDiffList, 
+      AmazonWebServicesClientProxy proxy,
+      CallbackContext callbackContext, 
+      Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap,
+      ResourceModel model,
+      Logger logger) {
     int index = callbackContext.getAddResourceListIndex();
     if (useResourceDiffList) {
-      addAssociatedResource(callbackContext.getAddResourceList().get(index));
+      addAssociatedResource(callbackContext.getAddResourceList().get(index), proxy, proxyClientMap, model, logger);
     } else {
-      addAssociatedResource(model.getResourceArns().get(index));
+      addAssociatedResource(model.getResourceArns().get(index), proxy, proxyClientMap, model, logger);
     }
     callbackContext.setAddResourceListIndex(index + 1);
     return ProgressEvent.<ResourceModel, CallbackContext>builder()
@@ -229,9 +222,14 @@ public abstract class BaseHandlerStd extends BaseHandler<CallbackContext> {
    * RemoveResourceListIndex in the callbackContext
    * @return send back an in progress event
    */
-  protected ProgressEvent<ResourceModel, CallbackContext> removeAssociatedResources() {
+  protected ProgressEvent<ResourceModel, CallbackContext> removeAssociatedResources(
+      AmazonWebServicesClientProxy proxy, 
+      CallbackContext callbackContext,
+      Map<Region, ProxyClient<SyntheticsClient>> proxyClientMap,
+      ResourceModel model,
+      Logger logger) {
     int index = callbackContext.getRemoveResourceListIndex();
-    removeAssociatedResource(callbackContext.getRemoveResourceList().get(index));
+    removeAssociatedResource(callbackContext.getRemoveResourceList().get(index), proxy, proxyClientMap, model, logger);
 
     callbackContext.setRemoveResourceListIndex(index + 1);
     return ProgressEvent.<ResourceModel, CallbackContext>builder()

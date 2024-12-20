@@ -1,11 +1,14 @@
 package com.amazon.synthetics.canary;
 
 import software.amazon.awssdk.arns.Arn;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.synthetics.model.ArtifactConfigInput;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeOutput;
 import software.amazon.awssdk.services.synthetics.model.CanaryScheduleOutput;
+import software.amazon.awssdk.services.synthetics.model.ProvisionedResourceCleanupSetting;
+import software.amazon.awssdk.services.synthetics.model.ResourceToTag;
 import software.amazon.awssdk.services.synthetics.model.S3EncryptionConfig;
 import software.amazon.awssdk.services.synthetics.model.VisualReferenceInput;
 import software.amazon.awssdk.services.synthetics.model.VisualReferenceOutput;
@@ -21,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -28,8 +32,18 @@ public class ModelHelper {
     private static final String NODE_MODULES_DIR = "/nodejs/node_modules/";
     private static final String JS_SUFFIX = ".js";
 
-    private static final String ADD_TAGS = "ADD_TAGS";
-    private static final String REMOVE_TAGS = "REMOVE_TAGS";
+    public static final String ADD_TAGS = "ADD_TAGS";
+    public static final String REMOVE_TAGS = "REMOVE_TAGS";
+
+    private static final List<String> TAGGING_PERMISSIONS = Arrays.asList(
+        "synthetics:TagResource",
+        "synthetics:UntagResource",
+        "synthetics:ListTagsForResource",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:ListTags"
+    );
+    private static final Pattern TAGGING_PERMISSIONS_PATTERN = Pattern.compile(String.join("|", TAGGING_PERMISSIONS));
 
     // Python Runtime
     private static final String PYTHON_DIR = "/python/";
@@ -51,6 +65,7 @@ public class ModelHelper {
         model.setSchedule(buildCanaryScheduleObject(canary.schedule()));
         // Tags are optional. Check for null
         model.setTags(tags != null ? buildTagObject(tags) : null);
+        model.setProvisionedResourceCleanup(canary.provisionedResourceCleanupAsString());
 
         // VPC Config is optional. Check for null
         if (!CanaryHelper.isNullOrEmpty(canary.vpcConfig())) {
@@ -191,28 +206,30 @@ public class ModelHelper {
         return tagMap;
     }
 
-    public static Map<String, Map<String, String>> updateTags(ResourceModel model, Map<String, String> existingTags) {
+    public static Map<String, Map<String, String>> buildTagDiff(List<Tag> requestedTags, Map<String, String> existingTags) {
         Map<String, String> modelTagMap = new HashMap<>();
-        List<Tag> modelTagList = model.getTags();
         Set<Map.Entry<String, String>> modelTagsES = null;
         Set<Map.Entry<String, String>> canaryTags = null;
         Set<Map.Entry<String, String>> modelTagsCopyES = null;
         Map<String, Map<String, String>> store = new HashMap<String, Map<String, String>>();
         Map<String, String> copyExistingTags = new HashMap<>(existingTags);
 
-        if (modelTagList != null) {
-            for (Tag tag : modelTagList) {
-                modelTagMap.put(tag.getKey(), tag.getValue());
-            }
-            modelTagsES = modelTagMap.entrySet();
-            modelTagsCopyES = new HashSet<Map.Entry<String, String>>(modelTagMap.entrySet());
+        if (requestedTags == null || requestedTags.isEmpty()) {
+            // If no tags were provided in template, remove all tags
+            store.put(ADD_TAGS, new HashMap<>());
+            store.put(REMOVE_TAGS, existingTags);
+ 
+            return store;
         }
+
+        for (Tag tag : requestedTags) {
+            modelTagMap.put(tag.getKey(), tag.getValue());
+        }
+        modelTagsES = modelTagMap.entrySet();
+        modelTagsCopyES = new HashSet<Map.Entry<String, String>>(modelTagMap.entrySet());
 
         canaryTags = copyExistingTags.entrySet();
 
-        if (modelTagList == null) {
-            return null;
-        }
         Set<Map.Entry<String, String>> finalCanaryTags = canaryTags;
         // Get an iterator
         Iterator<Map.Entry<String, String>> modelIterator = modelTagsES.iterator();
@@ -336,5 +353,46 @@ public class ModelHelper {
         return ArtifactConfigInput.builder().s3Encryption(S3EncryptionConfig.builder()
                 .encryptionMode(encryptionMode)
                 .kmsKeyArn(kmsKeyArn).build()).build();
+    }
+    
+    public static Collection<ResourceToTag> buildReplicateTags(List<String> resourcesToReplicateTags) {
+        if (resourcesToReplicateTags == null) {
+            return null;
+        }
+ 
+        return resourcesToReplicateTags.stream()
+                .map(ResourceToTag::fromValue)
+                .collect(Collectors.toList());
+    }
+ 
+    public static boolean isMissingTaggingPermissionsError(AwsServiceException e) {
+        int statusCode = e.statusCode();
+        String errorMessage = e.getMessage();
+ 
+        Matcher taggingPermissionsMatcher = TAGGING_PERMISSIONS_PATTERN.matcher(errorMessage);
+ 
+        return statusCode == 403 && taggingPermissionsMatcher.find();
+    }
+ 
+    public static boolean provisionedResourceCleanupSettingHasUpdate(Canary canary, ResourceModel model) {
+        String provisionedResourceCleanupSetting = getProvisionedResourceCleanupSetting(model);
+        // if ProvisionedResourceCleanupSetting has no value, there is no update present
+        if (provisionedResourceCleanupSetting == null) {
+            return false;
+        }
+        return !Objects.equals(canary.provisionedResourceCleanupAsString(), provisionedResourceCleanupSetting);
+    }
+ 
+    public static String getProvisionedResourceCleanupSetting(ResourceModel model) {
+        if (model.getProvisionedResourceCleanup() != null) {
+            // if ProvisionedResourceCleanup setting is populated, always use the value
+            return model.getProvisionedResourceCleanup();
+        } else if (Boolean.FALSE.equals(model.getDeleteLambdaResourcesOnCanaryDeletion())) {
+            // if DeleteLambdaResourcesOnCanaryDeletion is explicitly false, turn ProvisionedResourceCleanup to OFF to maintain backwards compatability
+            return ProvisionedResourceCleanupSetting.OFF.toString();
+        } else {
+            // otherwise default to providing no value
+            return null;
+        }
     }
 }

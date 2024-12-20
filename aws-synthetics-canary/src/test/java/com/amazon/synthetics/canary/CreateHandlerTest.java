@@ -4,6 +4,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
+
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.services.synthetics.model.*;
 import software.amazon.cloudformation.proxy.HandlerErrorCode;
 import software.amazon.cloudformation.proxy.OperationStatus;
@@ -11,9 +16,12 @@ import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.set;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 
@@ -28,6 +36,110 @@ public class CreateHandlerTest extends TestBase {
         assertThat(response.getResourceModel()).isNotNull();
 
         verify(proxy).injectCredentialsAndInvokeV2(any(CreateCanaryRequest.class), any());
+    }
+
+    @Test
+    public void handleRequest_createCanaryWithTags_AccessDenied() {
+        ResourceModel model = buildModel(true);
+ 
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+        final CallbackContext inputContext = CallbackContext.builder().build();
+ 
+        final AwsServiceException exception = AwsServiceException.builder()
+                .statusCode(403)
+                .awsErrorDetails(AwsErrorDetails.builder()
+                        .errorMessage(TestBase.MISSING_TAGGING_PERMISSIONS_ERROR_MESSAGE)
+                        .build())
+                .build();
+ 
+        doThrow(exception)
+                .when(proxy).injectCredentialsAndInvokeV2(any(CreateCanaryRequest.class), any());
+ 
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, inputContext, logger);
+ 
+        // Verify resource update fails with UnauthorizedTaggingOperation when missing tagging permissions
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(OperationStatus.FAILED);
+        assertThat(response.getErrorCode()).isEqualTo(HandlerErrorCode.UnauthorizedTaggingOperation);
+    }
+ 
+    @Test
+    public void handleRequest_createCanary_explicitDeleteLambdaResourcesOnCanaryDeletionDeny_THEN_provisionedResourceCleanupSetToOff() {
+        ResourceModel model = buildModel();
+        model.setProvisionedResourceCleanup(null);
+        model.setDeleteLambdaResourcesOnCanaryDeletion(false);
+ 
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+        handler.handleRequest(proxy, request, null, logger);
+ 
+        final ArgumentCaptor<CreateCanaryRequest> createRequestCaptor = ArgumentCaptor.forClass(
+                CreateCanaryRequest.class);
+        Mockito.verify(proxy, atLeastOnce())
+                .injectCredentialsAndInvokeV2(createRequestCaptor.capture(), any());
+        final CreateCanaryRequest createRequest = createRequestCaptor.getValue();
+        assertThat(createRequest.provisionedResourceCleanup()).isEqualTo(ProvisionedResourceCleanupSetting.OFF);
+    }
+ 
+    @Test
+    public void handleRequest_createCanary_explicitDeleteLambdaResourcesOnCanaryDeletionAllow_THEN_provisionedResourceSettingOmitted() {
+        ResourceModel model = buildModel();
+        model.setProvisionedResourceCleanup(null);
+        model.setDeleteLambdaResourcesOnCanaryDeletion(true);
+ 
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+        handler.handleRequest(proxy, request, null, logger);
+ 
+        final ArgumentCaptor<CreateCanaryRequest> createRequestCaptor = ArgumentCaptor.forClass(
+                CreateCanaryRequest.class);
+        Mockito.verify(proxy, atLeastOnce())
+                .injectCredentialsAndInvokeV2(createRequestCaptor.capture(), any());
+        final CreateCanaryRequest createRequest = createRequestCaptor.getValue();
+        assertThat(createRequest.provisionedResourceCleanup()).isNull();
+    }
+ 
+    @ParameterizedTest
+    @ValueSource(strings = {"OFF", "AUTOMATIC"})
+    public void handleRequest_createCanary_explicitProvisionedResourceCleanupSetting_THEN_provisionedResourceCleanupSetToSetting(String setting) {
+        ResourceModel model = buildModel();
+        model.setProvisionedResourceCleanup(setting);
+        model.setDeleteLambdaResourcesOnCanaryDeletion(null);
+ 
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+        handler.handleRequest(proxy, request, null, logger);
+ 
+        final ArgumentCaptor<CreateCanaryRequest> createRequestCaptor = ArgumentCaptor.forClass(
+                CreateCanaryRequest.class);
+        Mockito.verify(proxy, atLeastOnce())
+                .injectCredentialsAndInvokeV2(createRequestCaptor.capture(), any());
+        final CreateCanaryRequest createRequest = createRequestCaptor.getValue();
+        assertThat(createRequest.provisionedResourceCleanupAsString()).isEqualTo(setting);
+    }
+ 
+    @Test
+    public void handleRequest_createCanary_absentProvisionedResourceCleanupSetting_THEN_provisionedResourceSettingOmitted() {
+        ResourceModel model = buildModel();
+        model.setProvisionedResourceCleanup(null);
+        model.setDeleteLambdaResourcesOnCanaryDeletion(null);
+ 
+        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+        handler.handleRequest(proxy, request, null, logger);
+ 
+        final ArgumentCaptor<CreateCanaryRequest> createRequestCaptor = ArgumentCaptor.forClass(
+                CreateCanaryRequest.class);
+        Mockito.verify(proxy, atLeastOnce())
+                .injectCredentialsAndInvokeV2(createRequestCaptor.capture(), any());
+        final CreateCanaryRequest createRequest = createRequestCaptor.getValue();
+        assertThat(createRequest.provisionedResourceCleanup()).isNull();
     }
 
     @Test

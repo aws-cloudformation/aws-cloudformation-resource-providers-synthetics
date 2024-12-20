@@ -1,6 +1,7 @@
 package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.services.synthetics.model.CanaryState;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeInput;
@@ -147,6 +148,8 @@ public class CreateHandler extends CanaryActionHandler {
                 .successRetentionPeriodInDays(model.getSuccessRetentionPeriod())
                 .runConfig(canaryRunConfigInput)
                 .artifactConfig(ModelHelper.getArtifactConfigInput(model.getArtifactConfig()))
+                .resourcesToReplicateTags(ModelHelper.buildReplicateTags(model.getResourcesToReplicateTags()))
+                .provisionedResourceCleanup(ModelHelper.getProvisionedResourceCleanupSetting(model))
                 .build();
         try {
             proxy.injectCredentialsAndInvokeV2(createCanaryRequest, syntheticsClient::createCanary);
@@ -157,6 +160,15 @@ public class CreateHandler extends CanaryActionHandler {
                 throw new CfnInvalidRequestException(e.getMessage());
             }
         } catch (final Exception e) {
+            if (ModelHelper.isMissingTaggingPermissionsError((AwsServiceException) e)) {
+                log(String.format("Failed to tag canary/Lambda during create: %s", e.getMessage()));
+                return ProgressEvent.<ResourceModel, CallbackContext>failed(
+                        model,
+                        context,
+                        HandlerErrorCode.UnauthorizedTaggingOperation,
+                        e.getMessage()
+                );
+            }
             throw new CfnGeneralServiceException(e.getMessage());
         }
 

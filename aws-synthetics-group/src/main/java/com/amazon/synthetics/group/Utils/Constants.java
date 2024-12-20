@@ -15,10 +15,10 @@ public class Constants {
     public static final String MAKING_REMOVE_ASSOCIATE = "Making remove association call";
     public static final String ADD_TAGS = "AddTags";
     public static final String REMOVE_TAGS = "RemoveTags";
-    public static String INVOKING_HANDLER_MSG = "Invoking Group handler";
-    public static String INVOKING_HANDLER_FINISHED_MSG = "Handler Group executed";
-    public static String ADDING_RESOURCES_IN_PROGRESS = "Adding resources to the group is in progress";
-    public static String REMOVING_RESOURCES_IN_PROGRESS = "Removing resources to the group is in progress";
-    public static String GROUP_UPDATE_DIFF_COMPLETE = "Creating a diff for update completed";
+    public static final String INVOKING_HANDLER_MSG = "Invoking Group handler";
+    public static final String INVOKING_HANDLER_FINISHED_MSG = "Handler Group executed";
+    public static final String ADDING_RESOURCES_IN_PROGRESS = "Adding resources to the group is in progress";
+    public static final String REMOVING_RESOURCES_IN_PROGRESS = "Removing resources to the group is in progress";
+    public static final String GROUP_UPDATE_DIFF_COMPLETE = "Creating a diff for update completed";
 
 }

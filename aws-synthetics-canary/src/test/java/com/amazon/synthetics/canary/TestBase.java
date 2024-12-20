@@ -2,6 +2,8 @@ package com.amazon.synthetics.canary;
 
 import com.google.common.base.Strings;
 
+import software.amazon.awssdk.services.lambda.model.ListTagsRequest;
+import software.amazon.awssdk.services.lambda.model.ListTagsResponse;
 import software.amazon.awssdk.services.synthetics.model.ArtifactConfigOutput;
 import software.amazon.awssdk.services.synthetics.model.Canary;
 import software.amazon.awssdk.services.synthetics.model.CanaryCodeInput;
@@ -11,10 +13,12 @@ import software.amazon.awssdk.services.synthetics.model.CanaryRunConfigOutput;
 import software.amazon.awssdk.services.synthetics.model.CanaryScheduleInput;
 import software.amazon.awssdk.services.synthetics.model.CanaryScheduleOutput;
 import software.amazon.awssdk.services.synthetics.model.CanaryState;
+import software.amazon.awssdk.services.synthetics.model.CanaryStateReasonCode;
 import software.amazon.awssdk.services.synthetics.model.CanaryStatus;
 import software.amazon.awssdk.services.synthetics.model.CreateCanaryRequest;
 import software.amazon.awssdk.services.synthetics.model.GetCanaryRequest;
 import software.amazon.awssdk.services.synthetics.model.GetCanaryResponse;
+import software.amazon.awssdk.services.synthetics.model.ResourceToTag;
 import software.amazon.awssdk.services.synthetics.model.S3EncryptionConfig;
 import software.amazon.awssdk.services.synthetics.model.VpcConfigInput;
 import software.amazon.awssdk.services.synthetics.model.VpcConfigOutput;
@@ -23,6 +27,7 @@ import software.amazon.cloudformation.proxy.Logger;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +35,16 @@ import java.util.regex.Pattern;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class TestBase {
     protected static final String CANARY_NAME = "canary-name";
     protected static final String ERROR_STATE_REASON = "Failure message";
+    protected static final String MISSING_TAGGING_PERMISSIONS_ERROR_MESSAGE = "User: arn:aws:sts::123456789012:assumed-role/MissingTaggingPermissionsRole/AWSCloudFormation " +
+        "is not authorized to perform: synthetics:UntagResource on resource: arn:aws:synthetics:us-west-2:123456789012:canary:canary-name " +
+        "with an explicit deny";
 
     protected static final ResourceHandlerRequest<ResourceModel> REQUEST_WITH_DELETELAMBDA = ResourceHandlerRequest.<ResourceModel>builder()
         .desiredResourceState(buildModel("syn-nodejs-2.0-beta", false, false, true, true))
@@ -98,6 +107,7 @@ public class TestBase {
                                     .kmsKeyArn(useDefaultS3Encryption ? null : "arn:kms")
                                     .build())
                             .build())
+                    .resourcesToReplicateTags(Collections.singletonList(ResourceToTag.LAMBDA_FUNCTION.toString()))
                     .build();
             return model;
         }
@@ -266,18 +276,32 @@ public class TestBase {
     }
 
     protected static Canary createCanaryWithState(CanaryState state, String stateReason) {
+        return createCanaryWithState(state, stateReason, null);
+    }
+
+    protected static Canary createCanaryWithState(CanaryState state, String stateReason, CanaryStateReasonCode stateReasonCode) {
         return Canary.builder()
                 .name(CANARY_NAME)
                 .executionRoleArn("test execution arn")
+                .engineArn("test:lambda:arn")
                 .code(codeOutputObjectForTesting())
                 .status(CanaryStatus.builder()
                         .state(state)
                         .stateReason(stateReason)
+                        .stateReasonCode(stateReasonCode)
                         .build())
                 .runConfig(CanaryRunConfigOutput.builder().timeoutInSeconds(60).build())
                 .schedule(canaryScheduleOutputForTesting())
                 .runtimeVersion("syn-1.0")
                 .build();
+    }
+
+    protected void configureLambdaListTagsResponse() {
+        final ListTagsResponse listTagsResponse = ListTagsResponse.builder()
+                .tags(new HashMap<>())
+                .build();
+        doReturn(listTagsResponse)
+                .when(proxy).injectCredentialsAndInvokeV2(any(ListTagsRequest.class), any());
     }
 
     protected static ResourceModel buildModel() {
@@ -425,6 +449,7 @@ public class TestBase {
                     .runConfig(runConfig)
                     .failureRetentionPeriod(31)
                     .successRetentionPeriod(31)
+                    .resourcesToReplicateTags(Collections.singletonList(ResourceToTag.LAMBDA_FUNCTION.toString()))
                     .build();
         }
 
@@ -482,6 +507,7 @@ public class TestBase {
                     .successRetentionPeriodInDays(model.getSuccessRetentionPeriod())
                     .runConfig(canaryRunConfigInput)
                     .artifactConfig(ModelHelper.getArtifactConfigInput(model.getArtifactConfig()))
+                    .resourcesToReplicateTags(ModelHelper.buildReplicateTags(model.getResourcesToReplicateTags()))
                     .build();
         }
         return CreateCanaryRequest.builder()
@@ -503,5 +529,14 @@ public class TestBase {
                 .build();
     }
 
-
+    public ResourceHandlerRequest<ResourceModel> buildResourceHandlerRequestWithTagReplication(String canaryName) {
+        final ResourceModel model = ResourceModel.builder()
+                .name(canaryName)
+                .resourcesToReplicateTags(Collections.singletonList(ResourceToTag.LAMBDA_FUNCTION.toString()))
+                .build();
+ 
+        return ResourceHandlerRequest.<ResourceModel>builder()
+                .desiredResourceState(model)
+                .build();
+    }
 }
